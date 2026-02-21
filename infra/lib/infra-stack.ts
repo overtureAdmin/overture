@@ -22,20 +22,24 @@ export class InfraStack extends cdk.Stack {
       allowAllOutbound: true,
     });
 
-    // Security group dedicated to VPC interface endpoints
-    const endpointsSg = new ec2.SecurityGroup(this, 'UnityAppealsEndpointsSg', {
-      vpc,
-      securityGroupName: 'unity-appeals-dev-endpoints-sg',
-      description: 'Security group for Unity Appeals VPC interface endpoints',
-      allowAllOutbound: true,
-    });
+    const existingEndpointSgId =
+      this.node.tryGetContext('existingEndpointSecurityGroupId') ?? 'sg-0c03fdabccd351608';
+    const endpointsSg = ec2.SecurityGroup.fromSecurityGroupId(
+      this,
+      'ExistingEndpointsSg',
+      existingEndpointSgId,
+      { mutable: true }
+    );
 
     // Allow ECS tasks to reach endpoint ENIs on TLS port
-    endpointsSg.addIngressRule(
-      appSg,
-      ec2.Port.tcp(443),
-      'Allow ECS tasks to access interface endpoints over TLS'
-    );
+    new ec2.CfnSecurityGroupIngress(this, 'ExistingEndpointsSgFromAppSg443', {
+      groupId: endpointsSg.securityGroupId,
+      sourceSecurityGroupId: appSg.securityGroupId,
+      ipProtocol: 'tcp',
+      fromPort: 443,
+      toPort: 443,
+      description: 'Allow ECS tasks to access interface endpoints over TLS',
+    });
 
     // ALB Security Group - already exists, import it
     const albSg = ec2.SecurityGroup.fromSecurityGroupId(
@@ -52,57 +56,6 @@ export class InfraStack extends cdk.Stack {
     const cluster = new ecs.Cluster(this, 'UnityAppealsCluster', {
       vpc,
       clusterName: 'unity-appeals-dev-cluster',
-    });
-
-    const endpointSubnets: ec2.SubnetSelection = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
-
-    // Required interface endpoints for private ECS startup path
-    const logsEndpoint = new ec2.InterfaceVpcEndpoint(this, 'LogsVpcEndpoint', {
-      vpc,
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-      privateDnsEnabled: true,
-      securityGroups: [endpointsSg],
-      subnets: endpointSubnets,
-    });
-
-    const secretsManagerEndpoint = new ec2.InterfaceVpcEndpoint(this, 'SecretsManagerVpcEndpoint', {
-      vpc,
-      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      privateDnsEnabled: true,
-      securityGroups: [endpointsSg],
-      subnets: endpointSubnets,
-    });
-
-    const kmsEndpoint = new ec2.InterfaceVpcEndpoint(this, 'KmsVpcEndpoint', {
-      vpc,
-      service: ec2.InterfaceVpcEndpointAwsService.KMS,
-      privateDnsEnabled: true,
-      securityGroups: [endpointsSg],
-      subnets: endpointSubnets,
-    });
-
-    const ecrApiEndpoint = new ec2.InterfaceVpcEndpoint(this, 'EcrApiVpcEndpoint', {
-      vpc,
-      service: ec2.InterfaceVpcEndpointAwsService.ECR,
-      privateDnsEnabled: true,
-      securityGroups: [endpointsSg],
-      subnets: endpointSubnets,
-    });
-
-    const ecrDkrEndpoint = new ec2.InterfaceVpcEndpoint(this, 'EcrDockerVpcEndpoint', {
-      vpc,
-      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
-      privateDnsEnabled: true,
-      securityGroups: [endpointsSg],
-      subnets: endpointSubnets,
-    });
-
-    const stsEndpoint = new ec2.InterfaceVpcEndpoint(this, 'StsVpcEndpoint', {
-      vpc,
-      service: ec2.InterfaceVpcEndpointAwsService.STS,
-      privateDnsEnabled: true,
-      securityGroups: [endpointsSg],
-      subnets: endpointSubnets,
     });
 
     // ECR repo for the web image
@@ -153,28 +106,28 @@ export class InfraStack extends cdk.Stack {
       value: endpointsSg.securityGroupId,
     });
 
-    new cdk.CfnOutput(this, 'LogsVpcEndpointId', {
-      value: logsEndpoint.vpcEndpointId,
+    new cdk.CfnOutput(this, 'ExistingLogsVpcEndpointId', {
+      value: this.node.tryGetContext('existingLogsVpcEndpointId') ?? 'vpce-0ce79d655ff2c3126',
     });
 
-    new cdk.CfnOutput(this, 'SecretsManagerVpcEndpointId', {
-      value: secretsManagerEndpoint.vpcEndpointId,
+    new cdk.CfnOutput(this, 'ExistingSecretsManagerVpcEndpointId', {
+      value: this.node.tryGetContext('existingSecretsManagerVpcEndpointId') ?? 'vpce-0a7aa949562b1cfc5',
     });
 
-    new cdk.CfnOutput(this, 'KmsVpcEndpointId', {
-      value: kmsEndpoint.vpcEndpointId,
+    new cdk.CfnOutput(this, 'ExistingKmsVpcEndpointId', {
+      value: this.node.tryGetContext('existingKmsVpcEndpointId') ?? 'vpce-0f59a30ceae685706',
     });
 
-    new cdk.CfnOutput(this, 'EcrApiVpcEndpointId', {
-      value: ecrApiEndpoint.vpcEndpointId,
+    new cdk.CfnOutput(this, 'ExistingEcrApiVpcEndpointId', {
+      value: this.node.tryGetContext('existingEcrApiVpcEndpointId') ?? 'set-via-cdk-context',
     });
 
-    new cdk.CfnOutput(this, 'EcrDockerVpcEndpointId', {
-      value: ecrDkrEndpoint.vpcEndpointId,
+    new cdk.CfnOutput(this, 'ExistingEcrDockerVpcEndpointId', {
+      value: this.node.tryGetContext('existingEcrDockerVpcEndpointId') ?? 'set-via-cdk-context',
     });
 
-    new cdk.CfnOutput(this, 'StsVpcEndpointId', {
-      value: stsEndpoint.vpcEndpointId,
+    new cdk.CfnOutput(this, 'ExistingStsVpcEndpointId', {
+      value: this.node.tryGetContext('existingStsVpcEndpointId') ?? 'set-via-cdk-context',
     });
 
     new cdk.CfnOutput(this, 'WebLoadBalancerDnsName', {
