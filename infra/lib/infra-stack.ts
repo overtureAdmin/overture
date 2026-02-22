@@ -7,6 +7,8 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 
 export interface InfraEnvironmentConfig {
   readonly account: string;
@@ -199,6 +201,92 @@ export class InfraStack extends cdk.Stack {
     webService.targetGroup.configureHealthCheck({
       path: '/',
       healthyHttpCodes: '200-399',
+    });
+    const dbInstanceIdentifier = config.dbHost.split('.')[0];
+
+    new cloudwatch.Alarm(this, 'AlbTarget5xxAlarm', {
+      alarmName: `${this.stackName}-alb-target-5xx`,
+      alarmDescription: 'ALB target group is returning elevated 5xx responses.',
+      metric: webService.targetGroup.metrics.httpCodeTarget(elbv2.HttpCodeTarget.TARGET_5XX_COUNT, {
+        period: cdk.Duration.minutes(5),
+        statistic: 'sum',
+      }),
+      threshold: 5,
+      evaluationPeriods: 1,
+      datapointsToAlarm: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+    });
+
+    new cloudwatch.Alarm(this, 'EcsRunningTaskAlarm', {
+      alarmName: `${this.stackName}-ecs-running-tasks-low`,
+      alarmDescription: 'ECS service has fewer running tasks than expected.',
+      metric: webService.service.metric('RunningTaskCount', {
+        period: cdk.Duration.minutes(1),
+        statistic: 'minimum',
+      }),
+      threshold: 1,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+    });
+
+    new cloudwatch.Alarm(this, 'RdsCpuHighAlarm', {
+      alarmName: `${this.stackName}-rds-cpu-high`,
+      alarmDescription: 'RDS CPU utilization is persistently high.',
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/RDS',
+        metricName: 'CPUUtilization',
+        dimensionsMap: {
+          DBInstanceIdentifier: dbInstanceIdentifier,
+        },
+        period: cdk.Duration.minutes(5),
+        statistic: 'average',
+      }),
+      threshold: 80,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+    });
+
+    new cloudwatch.Alarm(this, 'RdsFreeStorageLowAlarm', {
+      alarmName: `${this.stackName}-rds-free-storage-low`,
+      alarmDescription: 'RDS free storage is low.',
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/RDS',
+        metricName: 'FreeStorageSpace',
+        dimensionsMap: {
+          DBInstanceIdentifier: dbInstanceIdentifier,
+        },
+        period: cdk.Duration.minutes(5),
+        statistic: 'average',
+      }),
+      threshold: 5 * 1024 * 1024 * 1024,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+    });
+
+    new cloudwatch.Alarm(this, 'RdsConnectionsHighAlarm', {
+      alarmName: `${this.stackName}-rds-connections-high`,
+      alarmDescription: 'RDS active connections are high.',
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/RDS',
+        metricName: 'DatabaseConnections',
+        dimensionsMap: {
+          DBInstanceIdentifier: dbInstanceIdentifier,
+        },
+        period: cdk.Duration.minutes(5),
+        statistic: 'average',
+      }),
+      threshold: 80,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
     });
 
     new cdk.CfnOutput(this, 'AppSecurityGroupId', {
