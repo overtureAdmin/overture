@@ -25,9 +25,9 @@ export interface InfraEnvironmentConfig {
   readonly existingLogsVpcEndpointId: string;
   readonly existingSecretsManagerVpcEndpointId: string;
   readonly existingKmsVpcEndpointId: string;
-  readonly existingEcrApiVpcEndpointId: string;
-  readonly existingEcrDockerVpcEndpointId: string;
-  readonly existingStsVpcEndpointId: string;
+  readonly existingEcrApiVpcEndpointId: string | null;
+  readonly existingEcrDockerVpcEndpointId: string | null;
+  readonly existingStsVpcEndpointId: string | null;
   readonly cognitoUserPoolName: string;
   readonly cognitoAppClientName: string;
 }
@@ -220,15 +220,15 @@ export class InfraStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'ExistingEcrApiVpcEndpointId', {
-      value: config.existingEcrApiVpcEndpointId,
+      value: config.existingEcrApiVpcEndpointId ?? 'not-configured',
     });
 
     new cdk.CfnOutput(this, 'ExistingEcrDockerVpcEndpointId', {
-      value: config.existingEcrDockerVpcEndpointId,
+      value: config.existingEcrDockerVpcEndpointId ?? 'not-configured',
     });
 
     new cdk.CfnOutput(this, 'ExistingStsVpcEndpointId', {
-      value: config.existingStsVpcEndpointId,
+      value: config.existingStsVpcEndpointId ?? 'not-configured',
     });
 
     new cdk.CfnOutput(this, 'ConfiguredCognitoUserPoolId', {
