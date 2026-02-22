@@ -42,7 +42,7 @@
         "cognitoUserPoolName": "unity-appeals-dev-users-cdk",
         "cognitoAppClientName": "unity-appeals-dev-web-cdk",
         "alarmEmailRecipients": [
-          "dev.user@unityappeals.local"
+          "ben@unityhealthtech.com"
         ],
         "rdsBackupRetentionDays": 7,
         "rdsPreferredBackupWindow": "03:00-04:00",
@@ -74,7 +74,7 @@
         "cognitoUserPoolName": "unity-appeals-staging-v2-users-cdk",
         "cognitoAppClientName": "unity-appeals-staging-v2-web-cdk",
         "alarmEmailRecipients": [
-          "dev.user@unityappeals.local"
+          "ben@unityhealthtech.com"
         ],
         "rdsBackupRetentionDays": 14,
         "rdsPreferredBackupWindow": "04:00-05:00",

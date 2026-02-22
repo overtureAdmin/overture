@@ -131,7 +131,9 @@ Build an MVP prior-authorization appeal application that:
 - SNS alarm verification:
   - Synthetic alarm transitions executed for dev + staging-v2 (`ALARM` then `OK`) at ~`2026-02-22T16:49Z`.
   - CloudWatch alarm history shows successful action execution to SNS topics in both environments.
-  - Subscription state remains `PendingConfirmation` for `dev.user@unityappeals.local` on both topics, so inbox delivery proof is still blocked pending manual confirmation.
+  - Alarm recipient config updated to `ben@unityhealthtech.com` and deployed to dev + staging-v2.
+  - Inbox delivery proof now confirmed by operator for both dev and staging-v2 alarms.
+  - `dev.user@unityappeals.local` stale entries remain in `PendingConfirmation`; AWS does not allow manual unsubscribe without a real subscription ARN, so these must age out automatically.
 - Endpoint policy drift checks:
   - `cd infra && npm run check:endpoint-policies` passed after infra updates.
 - App delivery progress:
@@ -147,10 +149,8 @@ Build an MVP prior-authorization appeal application that:
   - ECS task role now includes Bedrock invoke permissions and container env sets `BEDROCK_MODEL_ID`.
 
 ## Known Gaps / Next Priority Work
-1. Confirm SNS email subscription from inbox (`dev.user@unityappeals.local`) for both alarm topics.
-2. Build/push/deploy updated web container image so runtime serves new Bedrock/document pipeline API code.
-3. Run DB migrations in active runtime environments to apply `0002_generated_document_export.sql`.
-4. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
+1. Optional cleanup: old pending SNS placeholder subscriptions for `dev.user@unityappeals.local` after AWS auto-removal window.
+2. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
 
 ## Suggested “First Command” In Next Session
 ```bash
