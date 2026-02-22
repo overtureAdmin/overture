@@ -171,6 +171,12 @@ export class InfraStack extends cdk.Stack {
       new iam.PolicyStatement({
         actions: ['kms:Decrypt'],
         resources: [config.dbSecretKmsKeyArn],
+        conditions: {
+          StringEquals: {
+            'kms:ViaService': `secretsmanager.${cdk.Stack.of(this).region}.amazonaws.com`,
+            'kms:EncryptionContext:SecretARN': config.dbSecretArn,
+          },
+        },
       })
     );
 
