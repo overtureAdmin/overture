@@ -193,6 +193,12 @@ Build an MVP prior-authorization appeal application that:
      - export queue + status completion
      - internal export processor unauthorized (`401`) and authorized (`200`) checks.
    - Latest run passed in both environments.
+ - Alarm smoke automation (Phase 2.2 slice):
+   - Added script `infra/scripts/alarm-smoke.sh` and npm wrapper `npm run smoke:alarms`.
+   - Script performs synthetic `ALARM -> OK` transitions for:
+     - `InfraStack-alb-target-5xx`
+     - `InfraStack-staging-v2-alb-target-5xx`
+   - Latest run passed in both environments.
  - Alarm-noise hardening:
    - Updated ECS running-task alarm missing-data behavior from `BREACHING` to `NOT_BREACHING` in both stacks.
    - Verified both alarms are currently `OK`:

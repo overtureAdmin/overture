@@ -68,7 +68,7 @@ Status: In progress
 
 ### 2.2 Runtime checks
 - [x] Health/smoke script for dev and staging covering auth + thread + document flow.
-- [ ] Alarm validation script for periodic ALARM/OK synthetic checks.
+- [x] Alarm validation script for periodic ALARM/OK synthetic checks.
 
 Gate to Phase 3:
 - [ ] CI and smoke suite consistently green.

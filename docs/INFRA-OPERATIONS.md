@@ -162,24 +162,26 @@ npm run smoke:runtime
 
 ## Alarm Test Procedure
 
-Trigger ALARM state manually:
+Run synthetic alarm `ALARM -> OK` checks for both environments:
 
 ```bash
-aws cloudwatch set-alarm-state \
-  --region us-east-1 \
-  --alarm-name InfraStack-alb-target-5xx \
-  --state-value ALARM \
-  --state-reason "Synthetic alarm test"
+cd infra
+./scripts/alarm-smoke.sh both
 ```
 
-Reset to OK:
+Single environment:
 
 ```bash
-aws cloudwatch set-alarm-state \
-  --region us-east-1 \
-  --alarm-name InfraStack-alb-target-5xx \
-  --state-value OK \
-  --state-reason "Synthetic alarm test reset"
+cd infra
+./scripts/alarm-smoke.sh dev
+./scripts/alarm-smoke.sh staging
+```
+
+Equivalent npm script:
+
+```bash
+cd infra
+npm run smoke:alarms
 ```
 
 ## Export Queue Scheduler
