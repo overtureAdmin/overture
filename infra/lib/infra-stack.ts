@@ -8,29 +8,56 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 
+export interface InfraEnvironmentConfig {
+  readonly account: string;
+  readonly region: string;
+  readonly vpcName: string;
+  readonly appSecurityGroupName: string;
+  readonly albSecurityGroupId: string;
+  readonly endpointSecurityGroupId: string;
+  readonly clusterName: string;
+  readonly ecrRepositoryName: string;
+  readonly dbHost: string;
+  readonly dbPort: number;
+  readonly dbName: string;
+  readonly dbSecretArn: string;
+  readonly dbSecretKmsKeyArn: string;
+  readonly existingLogsVpcEndpointId: string;
+  readonly existingSecretsManagerVpcEndpointId: string;
+  readonly existingKmsVpcEndpointId: string;
+  readonly existingEcrApiVpcEndpointId: string;
+  readonly existingEcrDockerVpcEndpointId: string;
+  readonly existingStsVpcEndpointId: string;
+  readonly cognitoUserPoolName: string;
+  readonly cognitoAppClientName: string;
+}
+
+interface InfraStackProps extends cdk.StackProps {
+  readonly config: InfraEnvironmentConfig;
+}
+
 export class InfraStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: InfraStackProps) {
     super(scope, id, props);
+    const { config } = props;
 
     // Import existing VPC by name
     const vpc = ec2.Vpc.fromLookup(this, 'ExistingVpc', {
-      vpcName: 'unity-appeals-dev-vpc-vpc',
+      vpcName: config.vpcName,
     });
 
     // App Security Group (ECS tasks) - created/managed by CDK
     const appSg = new ec2.SecurityGroup(this, 'UnityAppealsAppSg', {
       vpc,
-      securityGroupName: 'unity-appeals-dev-app-sg',
+      securityGroupName: config.appSecurityGroupName,
       description: 'Security group for Unity Appeals ECS app',
       allowAllOutbound: true,
     });
 
-    const existingEndpointSgId =
-      this.node.tryGetContext('existingEndpointSecurityGroupId') ?? 'sg-0c03fdabccd351608';
     const endpointsSg = ec2.SecurityGroup.fromSecurityGroupId(
       this,
       'ExistingEndpointsSg',
-      existingEndpointSgId,
+      config.endpointSecurityGroupId,
       { mutable: true }
     );
 
@@ -48,7 +75,7 @@ export class InfraStack extends cdk.Stack {
     const albSg = ec2.SecurityGroup.fromSecurityGroupId(
       this,
       'ExistingAlbSg',
-      'sg-0eb1ef4f97ee4c029',
+      config.albSecurityGroupId,
       { mutable: true }
     );
 
@@ -58,11 +85,11 @@ export class InfraStack extends cdk.Stack {
     // ECS Cluster (dev)
     const cluster = new ecs.Cluster(this, 'UnityAppealsCluster', {
       vpc,
-      clusterName: 'unity-appeals-dev-cluster',
+      clusterName: config.clusterName,
     });
 
     const userPool = new cognito.UserPool(this, 'UnityAppealsUserPool', {
-      userPoolName: 'unity-appeals-dev-users-cdk',
+      userPoolName: config.cognitoUserPoolName,
       selfSignUpEnabled: false,
       signInAliases: { email: true },
       autoVerify: { email: true },
@@ -81,7 +108,7 @@ export class InfraStack extends cdk.Stack {
     });
 
     const userPoolClient = userPool.addClient('UnityAppealsWebClient', {
-      userPoolClientName: 'unity-appeals-dev-web-cdk',
+      userPoolClientName: config.cognitoAppClientName,
       generateSecret: false,
       authFlows: {
         userPassword: true,
@@ -94,25 +121,20 @@ export class InfraStack extends cdk.Stack {
     const cognitoRegion = cdk.Stack.of(this).region;
     const cognitoUserPoolId = userPool.userPoolId;
     const cognitoAppClientId = userPoolClient.userPoolClientId;
-    const dbHost =
-      this.node.tryGetContext('dbHost') ?? 'unity-appeals-dev-db.cwdecey86htz.us-east-1.rds.amazonaws.com';
-    const dbPort = String(this.node.tryGetContext('dbPort') ?? 5432);
-    const dbName = this.node.tryGetContext('dbName') ?? 'unity_appeals';
-    const dbSecretArn =
-      this.node.tryGetContext('dbSecretArn') ??
-      'arn:aws:secretsmanager:us-east-1:726792844549:secret:rds!db-e9e0506a-eee0-4916-bf9f-0c3f20cedf95-Cqtgri';
-    const dbSecretKmsKeyArn =
-      this.node.tryGetContext('dbSecretKmsKeyArn') ??
-      'arn:aws:kms:us-east-1:726792844549:key/9dd888a6-a6d4-4f60-9215-90b98123f48c';
+    const dbPort = String(config.dbPort);
 
     const dbSecret = secretsmanager.Secret.fromSecretCompleteArn(
       this,
       'ExistingDbCredentialsSecret',
-      dbSecretArn
+      config.dbSecretArn
     );
 
     // ECR repo for the web image
-    const webRepo = ecr.Repository.fromRepositoryName(this, 'WebRepo', 'unity-appeals-web');
+    const webRepo = ecr.Repository.fromRepositoryName(
+      this,
+      'WebRepo',
+      config.ecrRepositoryName
+    );
 
     // TaskDefinition pinned to ARM64 (matches your pushed image)
     const taskDef = new ecs.FargateTaskDefinition(this, 'WebTaskDef', {
@@ -132,9 +154,9 @@ export class InfraStack extends cdk.Stack {
         COGNITO_REGION: cognitoRegion,
         COGNITO_USER_POOL_ID: cognitoUserPoolId,
         COGNITO_APP_CLIENT_ID: cognitoAppClientId,
-        DATABASE_HOST: dbHost,
+        DATABASE_HOST: config.dbHost,
         DATABASE_PORT: dbPort,
-        DATABASE_NAME: dbName,
+        DATABASE_NAME: config.dbName,
         DATABASE_SSL: 'require',
         DEV_BYPASS_AUTH: 'false',
       },
@@ -148,7 +170,7 @@ export class InfraStack extends cdk.Stack {
     taskDef.addToExecutionRolePolicy(
       new iam.PolicyStatement({
         actions: ['kms:Decrypt'],
-        resources: [dbSecretKmsKeyArn],
+        resources: [config.dbSecretKmsKeyArn],
       })
     );
 
@@ -186,27 +208,27 @@ export class InfraStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'ExistingLogsVpcEndpointId', {
-      value: this.node.tryGetContext('existingLogsVpcEndpointId') ?? 'vpce-0ce79d655ff2c3126',
+      value: config.existingLogsVpcEndpointId,
     });
 
     new cdk.CfnOutput(this, 'ExistingSecretsManagerVpcEndpointId', {
-      value: this.node.tryGetContext('existingSecretsManagerVpcEndpointId') ?? 'vpce-0a7aa949562b1cfc5',
+      value: config.existingSecretsManagerVpcEndpointId,
     });
 
     new cdk.CfnOutput(this, 'ExistingKmsVpcEndpointId', {
-      value: this.node.tryGetContext('existingKmsVpcEndpointId') ?? 'vpce-0f59a30ceae685706',
+      value: config.existingKmsVpcEndpointId,
     });
 
     new cdk.CfnOutput(this, 'ExistingEcrApiVpcEndpointId', {
-      value: this.node.tryGetContext('existingEcrApiVpcEndpointId') ?? 'set-via-cdk-context',
+      value: config.existingEcrApiVpcEndpointId,
     });
 
     new cdk.CfnOutput(this, 'ExistingEcrDockerVpcEndpointId', {
-      value: this.node.tryGetContext('existingEcrDockerVpcEndpointId') ?? 'set-via-cdk-context',
+      value: config.existingEcrDockerVpcEndpointId,
     });
 
     new cdk.CfnOutput(this, 'ExistingStsVpcEndpointId', {
-      value: this.node.tryGetContext('existingStsVpcEndpointId') ?? 'set-via-cdk-context',
+      value: config.existingStsVpcEndpointId,
     });
 
     new cdk.CfnOutput(this, 'ConfiguredCognitoUserPoolId', {
