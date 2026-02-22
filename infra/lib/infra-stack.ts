@@ -180,6 +180,7 @@ export class InfraStack extends cdk.Stack {
         DATABASE_NAME: config.dbName,
         DATABASE_SSL: 'require',
         DEV_BYPASS_AUTH: 'false',
+        BEDROCK_MODEL_ID: 'amazon.nova-lite-v1:0',
       },
       secrets: {
         DATABASE_USER: ecs.Secret.fromSecretsManager(dbSecret, 'username'),
@@ -198,6 +199,13 @@ export class InfraStack extends cdk.Stack {
             'kms:EncryptionContext:SecretARN': config.dbSecretArn,
           },
         },
+      })
+    );
+
+    taskDef.addToTaskRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:Converse', 'bedrock:InvokeModel'],
+        resources: [`arn:aws:bedrock:${cdk.Stack.of(this).region}::foundation-model/*`],
       })
     );
 

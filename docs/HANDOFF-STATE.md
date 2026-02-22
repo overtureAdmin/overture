@@ -124,13 +124,33 @@ Build an MVP prior-authorization appeal application that:
 - `16aaa50` chore: add staging infra context and concrete dev endpoint config
 - `3c92773` refactor: load infra defaults from per-environment context
 
+## Latest Session Updates (`2026-02-22`)
+- Legacy non-canonical stack decommissioned:
+  - `InfraStack-staging` deleted.
+  - Post-delete status check now returns `ValidationError: Stack with id InfraStack-staging does not exist`.
+- SNS alarm verification:
+  - Synthetic alarm transitions executed for dev + staging-v2 (`ALARM` then `OK`) at ~`2026-02-22T16:49Z`.
+  - CloudWatch alarm history shows successful action execution to SNS topics in both environments.
+  - Subscription state remains `PendingConfirmation` for `dev.user@unityappeals.local` on both topics, so inbox delivery proof is still blocked pending manual confirmation.
+- Endpoint policy drift checks:
+  - `cd infra && npm run check:endpoint-policies` passed after infra updates.
+- App delivery progress:
+  - `POST /api/chat/:threadId/message` now uses Bedrock (`Converse`) instead of stub text and persists assistant response + audit metadata.
+  - Document pipeline endpoints now enforce auth + tenant scoping and persist DB records + audit events:
+    - `POST /api/documents/:id/generate`
+    - `POST /api/documents/:id/revise`
+    - `POST /api/documents/:id/export`
+  - Added migration `web/db/migrations/0002_generated_document_export.sql` for export-job persistence.
+- Infra deployment updates:
+  - `InfraStack` deployed successfully.
+  - `NetworkStack-staging` (no changes) and `InfraStack-staging-v2` deployed successfully.
+  - ECS task role now includes Bedrock invoke permissions and container env sets `BEDROCK_MODEL_ID`.
+
 ## Known Gaps / Next Priority Work
-1. Promote staging-v2 as canonical and decommission legacy `InfraStack-staging` safely.
-2. Confirm SNS email subscription delivery in inbox (external/manual confirmation evidence still needed).
-3. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
-4. Begin app delivery:
-   - Implement Bedrock-backed path in `POST /api/chat/:threadId/message`.
-   - Implement document pipeline endpoints (`generate/revise/export`) with persistence + audit events.
+1. Confirm SNS email subscription from inbox (`dev.user@unityappeals.local`) for both alarm topics.
+2. Build/push/deploy updated web container image so runtime serves new Bedrock/document pipeline API code.
+3. Run DB migrations in active runtime environments to apply `0002_generated_document_export.sql`.
+4. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
 
 ## Suggested “First Command” In Next Session
 ```bash

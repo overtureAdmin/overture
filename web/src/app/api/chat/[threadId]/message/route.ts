@@ -1,4 +1,5 @@
 import { getAuthContextOrDevFallback, authRequiredResponse } from "@/lib/auth";
+import { generateTextWithBedrock, getBedrockModelId } from "@/lib/bedrock";
 import { getDbPool } from "@/lib/db";
 import { jsonError, jsonOk, parseJsonBody } from "@/lib/http";
 import { ensureTenantAndUser, insertAuditEvent } from "@/lib/tenant-context";
@@ -11,6 +12,12 @@ type ChatMessageBody = {
 type RouteParams = {
   params: Promise<{ threadId: string }>;
 };
+
+function buildChatPrompt(messages: Array<{ role: string; content: string }>): string {
+  return messages
+    .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
+    .join("\n\n");
+}
 
 export async function POST(request: Request, { params }: RouteParams) {
   const auth = await getAuthContextOrDevFallback(request);
@@ -56,7 +63,25 @@ export async function POST(request: Request, { params }: RouteParams) {
       [actor.tenantId, threadId, actor.userId, body.content.trim()],
     );
 
-    const assistantReply = "Stub response. Bedrock integration will be added next.";
+    const promptMessagesResult = await client.query<{ role: string; content: string }>(
+      `
+        SELECT role, content
+        FROM message
+        WHERE tenant_id = $1::uuid
+          AND thread_id = $2::uuid
+        ORDER BY created_at DESC
+        LIMIT 20
+      `,
+      [actor.tenantId, threadId],
+    );
+
+    const assistantReply = await generateTextWithBedrock({
+      systemPrompt:
+        "You are Unity Appeals assistant. Help draft prior-authorization appeals clearly and conservatively. PHI processing is disabled, so avoid patient-identifying details.",
+      userPrompt: buildChatPrompt([...promptMessagesResult.rows].reverse()),
+      temperature: 0.2,
+    });
+
     const assistantMessageResult = await client.query<{ id: string }>(
       `
         INSERT INTO message (tenant_id, thread_id, role, content, citations)
@@ -82,7 +107,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       action: "message.create",
       entityType: "thread",
       entityId: threadId,
-      metadata: { userMessageId: userMessageResult.rows[0].id },
+      metadata: {
+        userMessageId: userMessageResult.rows[0].id,
+        assistantMessageId: assistantMessageResult.rows[0].id,
+        modelId: getBedrockModelId(),
+        phiProcessingEnabled: false,
+      },
     });
 
     await client.query("COMMIT");

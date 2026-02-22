@@ -5,7 +5,7 @@
 ```bash
 cd infra
 npx cdk deploy InfraStack --require-approval never
-npx cdk deploy NetworkStack-staging InfraStack-staging -c environment=staging --require-approval never
+npx cdk deploy NetworkStack-staging InfraStack-staging-v2 -c environment=staging --require-approval never
 ```
 
 ## Rollback
@@ -65,12 +65,12 @@ curl -i -X GET \
 TOKEN=$(aws cognito-idp initiate-auth \
   --region us-east-1 \
   --auth-flow USER_PASSWORD_AUTH \
-  --client-id 2rdblpb10nurifc7lnbakueh5b \
+  --client-id 5395vq9loa484ipjcgtr3o5lh2 \
   --auth-parameters USERNAME=dev.user@unityappeals.local,PASSWORD='DevPass1!DevPass1!' \
   --query 'AuthenticationResult.IdToken' --output text)
 
 curl -i -X GET \
-  'http://InfraS-Unity-SGFGnibPGhvO-1822751984.us-east-1.elb.amazonaws.com/api/threads' \
+  'http://InfraS-Unity-iGMyoO90DG4I-1920092028.us-east-1.elb.amazonaws.com/api/threads' \
   -H "Authorization: Bearer $TOKEN"
 ```
 
