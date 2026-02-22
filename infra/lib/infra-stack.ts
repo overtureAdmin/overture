@@ -93,6 +93,10 @@ export class InfraStack extends cdk.Stack {
 
     // Add the pre-existing ALB SG (HTTPS allowed there)
     webService.loadBalancer.addSecurityGroup(albSg);
+    webService.targetGroup.configureHealthCheck({
+      path: '/',
+      healthyHttpCodes: '200-399',
+    });
 
     new cdk.CfnOutput(this, 'AppSecurityGroupId', {
       value: appSg.securityGroupId,

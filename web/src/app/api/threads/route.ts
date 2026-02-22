@@ -8,7 +8,7 @@ type CreateThreadBody = {
 };
 
 export async function GET(request: Request) {
-  const auth = getAuthContextOrDevFallback(request);
+  const auth = await getAuthContextOrDevFallback(request);
   if (!auth) {
     return authRequiredResponse();
   }
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = getAuthContextOrDevFallback(request);
+  const auth = await getAuthContextOrDevFallback(request);
   if (!auth) {
     return authRequiredResponse();
   }

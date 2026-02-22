@@ -13,7 +13,7 @@ type RouteParams = {
 };
 
 export async function POST(request: Request, { params }: RouteParams) {
-  const auth = getAuthContextOrDevFallback(request);
+  const auth = await getAuthContextOrDevFallback(request);
   if (!auth) {
     return authRequiredResponse();
   }

@@ -6,7 +6,7 @@ type GenerateBody = {
 };
 
 type RouteParams = {
-  params: Promise<{ threadId: string }>;
+  params: Promise<{ id: string }>;
 };
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -15,10 +15,10 @@ export async function POST(request: Request, { params }: RouteParams) {
     return jsonError("Missing required field: kind (lmn|appeal|p2p)", 422);
   }
 
-  const { threadId } = await params;
+  const { id } = await params;
   return jsonOk(
     {
-      threadId,
+      threadId: id,
       documentId: `doc_${crypto.randomUUID()}`,
       kind: body.kind,
       status: "draft_ready",
