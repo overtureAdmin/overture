@@ -87,6 +87,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         exportId: exportRecord.id,
         status: exportRecord.status,
         createdAt: exportRecord.created_at,
+        statusUrl: `/api/documents/${id}/export/${exportRecord.id}`,
       },
       201,
     );

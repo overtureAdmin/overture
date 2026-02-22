@@ -1,5 +1,8 @@
 # Unity Appeals MVP - Handoff State
 
+## Canonical Execution Plan
+- Use `docs/MASTER-PLAN.md` as the single ordered source of truth for remaining work and phase gates.
+
 ## Product Goal
 Build an MVP prior-authorization appeal application that:
 - Supports LMN, Appeal Letter, and P2P Cheat Sheet generation.
@@ -143,10 +146,16 @@ Build an MVP prior-authorization appeal application that:
     - `POST /api/documents/:id/revise`
     - `POST /api/documents/:id/export`
   - Added migration `web/db/migrations/0002_generated_document_export.sql` for export-job persistence.
+  - Export pipeline implemented end-to-end:
+    - Queue processor route: `POST /api/exports/process` (processes queued jobs with status transitions).
+    - Export status/download route: `GET /api/documents/:id/export/:exportId` (returns status + presigned S3 URL when complete).
+    - Artifact generation implemented for `.pdf` and `.docx`, with S3 persistence in per-environment documents buckets.
+    - Dev smoke and staging-v2 smoke confirmed `queued -> completed` plus valid download URLs.
 - Infra deployment updates:
   - `InfraStack` deployed successfully.
   - `NetworkStack-staging` (no changes) and `InfraStack-staging-v2` deployed successfully.
   - ECS task role now includes Bedrock invoke permissions and container env sets `BEDROCK_MODEL_ID`.
+  - Added documents S3 buckets + ECS task read/write grants + `DOCUMENTS_BUCKET_NAME` env var in both dev and staging-v2.
 
 ## Known Gaps / Next Priority Work
 1. Optional cleanup: old pending SNS placeholder subscriptions for `dev.user@unityappeals.local` after AWS auto-removal window.

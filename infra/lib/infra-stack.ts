@@ -10,6 +10,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
@@ -146,6 +147,15 @@ export class InfraStack extends cdk.Stack {
       'ExistingDbCredentialsSecret',
       config.dbSecretArn
     );
+    const documentsBucket = new s3.Bucket(this, 'DocumentsBucket', {
+      bucketName: `${this.stackName.toLowerCase()}-documents-${cdk.Stack.of(this).account}`,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      versioned: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+    });
 
     // ECR repo for the web image
     const webRepo = ecr.Repository.fromRepositoryName(
@@ -181,12 +191,14 @@ export class InfraStack extends cdk.Stack {
         DATABASE_SSL: 'require',
         DEV_BYPASS_AUTH: 'false',
         BEDROCK_MODEL_ID: 'amazon.nova-lite-v1:0',
+        DOCUMENTS_BUCKET_NAME: documentsBucket.bucketName,
       },
       secrets: {
         DATABASE_USER: ecs.Secret.fromSecretsManager(dbSecret, 'username'),
         DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(dbSecret, 'password'),
       },
     });
+    documentsBucket.grantReadWrite(taskDef.taskRole);
 
     // Secret retrieval for task startup also requires decrypt on the secret's KMS key.
     taskDef.addToExecutionRolePolicy(
@@ -394,6 +406,10 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'WebServiceUrl', {
       value: `http://${webService.loadBalancer.loadBalancerDnsName}`,
+    });
+
+    new cdk.CfnOutput(this, 'DocumentsBucketName', {
+      value: documentsBucket.bucketName,
     });
   }
 
