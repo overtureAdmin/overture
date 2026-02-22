@@ -50,8 +50,6 @@ if (deployEnvironment === 'staging') {
     endpointSecurityGroupId: networkStack.endpointSecurityGroup.securityGroupId,
     dbInstanceIdentifier: networkStack.dbInstance.instanceIdentifier,
     dbHost: networkStack.dbInstance.dbInstanceEndpointAddress,
-    dbSecretArn: networkStack.dbSecret.secretArn,
-    dbSecretKmsKeyArn: networkStack.dbSecretKmsKey.keyArn,
     existingLogsVpcEndpointId: networkStack.logsEndpoint.vpcEndpointId,
     existingSecretsManagerVpcEndpointId: networkStack.secretsManagerEndpoint.vpcEndpointId,
     existingKmsVpcEndpointId: networkStack.kmsEndpoint.vpcEndpointId,
@@ -68,7 +66,6 @@ if (deployEnvironment === 'staging') {
     config: stagingConfig,
     vpc: networkStack.vpc,
   });
-  infraStack.addDependency(networkStack);
 } else {
   new InfraStack(app, stackId, {
     env: {

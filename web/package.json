@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "migrate": "node scripts/run-migrations.mjs"
+    "migrate": "node scripts/run-migrations.mjs",
+    "migrate:secret": "node scripts/run-migrations-from-secret.mjs",
+    "provision:db-roles": "node scripts/provision-db-roles-from-secrets.mjs",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.995.0",

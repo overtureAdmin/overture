@@ -1,5 +1,12 @@
 # Infra Operations Runbook
 
+## Canonical Stacks
+
+- Dev app stack: `InfraStack`
+- Staging app stack: `InfraStack-staging-v2`
+- Staging network stack: `NetworkStack-staging`
+- Legacy `InfraStack-staging`: deleted/decommissioned
+
 ## Deploy
 
 ```bash
@@ -7,6 +14,61 @@ cd infra
 npx cdk deploy InfraStack --require-approval never
 npx cdk deploy NetworkStack-staging InfraStack-staging-v2 -c environment=staging --require-approval never
 ```
+
+## Database Migration Credentials (Standardized)
+
+Use three Secrets Manager entries per environment:
+
+- `<env>-db-admin` (admin/master user; only for role provisioning)
+- `<env>-app-db-credentials` (runtime ECS app user)
+- `<env>-migrator-db-credentials` (DDL migration user)
+
+Required secret JSON fields:
+
+```json
+{
+  "host": "db-hostname",
+  "port": 5432,
+  "dbname": "unity_appeals",
+  "username": "role_name",
+  "password": "role_password"
+}
+```
+
+### One-time / Rotation: Provision app + migrator roles
+
+This is the only step that uses admin credentials, and it is standardized via script (no ad hoc SQL).
+
+```bash
+cd web
+node scripts/provision-db-roles-from-secrets.mjs \
+  --region us-east-1 \
+  --admin-secret-id <admin-secret-id-or-arn> \
+  --app-secret-id <app-secret-id-or-arn> \
+  --migrator-secret-id <migrator-secret-id-or-arn>
+```
+
+### Run migrations (always with migrator secret)
+
+```bash
+cd web
+node scripts/run-migrations-from-secret.mjs \
+  --region us-east-1 \
+  --secret-id <migrator-secret-id-or-arn>
+```
+
+Equivalent npm wrapper:
+
+```bash
+cd web
+npm run migrate:secret -- --region us-east-1 --secret-id <migrator-secret-id-or-arn>
+```
+
+### Validate least privilege
+
+- ECS runtime uses the app secret only.
+- Migrations run with migrator secret only.
+- App role remains DML-only (no DDL at runtime).
 
 ## Rollback
 
@@ -94,4 +156,18 @@ aws cloudwatch set-alarm-state \
   --alarm-name InfraStack-alb-target-5xx \
   --state-value OK \
   --state-reason "Synthetic alarm test reset"
+```
+
+## Export Queue Scheduler
+
+- Internal processor route: `POST /api/internal/exports/process`
+- Auth: `x-export-processor-token` header with `EXPORT_PROCESSOR_SHARED_SECRET`.
+- Trigger: EventBridge rule (`rate(1 minute)`) invokes stack-managed Lambda that calls the internal route with limit `10`.
+
+Manual invocation check:
+
+```bash
+aws events list-rule-names-by-target \
+  --region us-east-1 \
+  --target-arn <EXPORT_QUEUE_SCHEDULER_LAMBDA_ARN>
 ```

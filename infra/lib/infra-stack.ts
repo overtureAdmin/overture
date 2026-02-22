@@ -1,4 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
+import { createHash } from 'node:crypto';
 import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -14,6 +15,9 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 
 export interface InfraEnvironmentConfig {
   readonly account: string;
@@ -30,7 +34,7 @@ export interface InfraEnvironmentConfig {
   readonly dbPort: number;
   readonly dbName: string;
   readonly dbSecretArn: string;
-  readonly dbSecretKmsKeyArn: string;
+  readonly dbSecretKmsKeyArn?: string | null;
   readonly existingLogsVpcEndpointId: string;
   readonly existingSecretsManagerVpcEndpointId: string;
   readonly existingKmsVpcEndpointId: string;
@@ -147,6 +151,9 @@ export class InfraStack extends cdk.Stack {
       'ExistingDbCredentialsSecret',
       config.dbSecretArn
     );
+    const exportProcessorToken = createHash('sha256')
+      .update(`${cdk.Stack.of(this).account}:${cdk.Stack.of(this).region}:${this.stackName}:export-processor:v1`)
+      .digest('hex');
     const documentsBucket = new s3.Bucket(this, 'DocumentsBucket', {
       bucketName: `${this.stackName.toLowerCase()}-documents-${cdk.Stack.of(this).account}`,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -192,6 +199,7 @@ export class InfraStack extends cdk.Stack {
         DEV_BYPASS_AUTH: 'false',
         BEDROCK_MODEL_ID: 'amazon.nova-lite-v1:0',
         DOCUMENTS_BUCKET_NAME: documentsBucket.bucketName,
+        EXPORT_PROCESSOR_SHARED_SECRET: exportProcessorToken,
       },
       secrets: {
         DATABASE_USER: ecs.Secret.fromSecretsManager(dbSecret, 'username'),
@@ -201,18 +209,20 @@ export class InfraStack extends cdk.Stack {
     documentsBucket.grantReadWrite(taskDef.taskRole);
 
     // Secret retrieval for task startup also requires decrypt on the secret's KMS key.
-    taskDef.addToExecutionRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['kms:Decrypt'],
-        resources: [config.dbSecretKmsKeyArn],
-        conditions: {
-          StringEquals: {
-            'kms:ViaService': `secretsmanager.${cdk.Stack.of(this).region}.amazonaws.com`,
-            'kms:EncryptionContext:SecretARN': config.dbSecretArn,
+    if (config.dbSecretKmsKeyArn) {
+      taskDef.addToExecutionRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['kms:Decrypt'],
+          resources: [config.dbSecretKmsKeyArn],
+          conditions: {
+            StringEquals: {
+              'kms:ViaService': `secretsmanager.${cdk.Stack.of(this).region}.amazonaws.com`,
+              'kms:EncryptionContext:SecretARN': config.dbSecretArn,
+            },
           },
-        },
-      })
-    );
+        })
+      );
+    }
 
     taskDef.addToTaskRolePolicy(
       new iam.PolicyStatement({
@@ -246,6 +256,74 @@ export class InfraStack extends cdk.Stack {
       path: '/',
       healthyHttpCodes: '200-399',
     });
+
+    const exportQueueSchedulerFn = new lambda.Function(this, 'ExportQueueSchedulerFn', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      timeout: cdk.Duration.seconds(30),
+      description: `Periodic export queue trigger for ${this.stackName}`,
+      environment: {
+        PROCESSOR_URL: `http://${webService.loadBalancer.loadBalancerDnsName}/api/internal/exports/process`,
+        PROCESSOR_TOKEN: exportProcessorToken,
+      },
+      code: lambda.Code.fromInline(`
+        const http = require('node:http');
+        const https = require('node:https');
+
+        function postJson(url, body, token) {
+          return new Promise((resolve, reject) => {
+            const target = new URL(url);
+            const payload = JSON.stringify(body);
+            const lib = target.protocol === 'https:' ? https : http;
+            const req = lib.request(
+              target,
+              {
+                method: 'POST',
+                headers: {
+                  'content-type': 'application/json',
+                  'content-length': Buffer.byteLength(payload),
+                  'x-export-processor-token': token,
+                },
+              },
+              (res) => {
+                let text = '';
+                res.setEncoding('utf8');
+                res.on('data', (chunk) => {
+                  text += chunk;
+                });
+                res.on('end', () => {
+                  if (res.statusCode >= 200 && res.statusCode < 300) {
+                    resolve(text);
+                  } else {
+                    reject(new Error('scheduler received status ' + res.statusCode + ': ' + text));
+                  }
+                });
+              }
+            );
+            req.on('error', reject);
+            req.write(payload);
+            req.end();
+          });
+        }
+
+        exports.handler = async () => {
+          const url = process.env.PROCESSOR_URL;
+          const token = process.env.PROCESSOR_TOKEN;
+          if (!url || !token) {
+            throw new Error('missing required environment');
+          }
+          await postJson(url, { limit: 10 }, token);
+          return { ok: true };
+        };
+      `),
+    });
+
+    new events.Rule(this, 'ExportQueueScheduleRule', {
+      description: `Runs export queue processor every minute for ${this.stackName}`,
+      schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
+      targets: [new eventsTargets.LambdaFunction(exportQueueSchedulerFn)],
+    });
+
     const alarmTopic = new sns.Topic(this, 'OpsAlarmTopic', {
       topicName: `${this.stackName.toLowerCase()}-alarms`,
       displayName: `${this.stackName} alarms`,
@@ -283,7 +361,7 @@ export class InfraStack extends cdk.Stack {
       threshold: 1,
       evaluationPeriods: 2,
       datapointsToAlarm: 2,
-      treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
     });
     ecsRunningTaskAlarm.addAlarmAction(alarmAction);

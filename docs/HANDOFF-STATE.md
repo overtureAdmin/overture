@@ -15,7 +15,7 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest pushed commit at handoff: `867cea6`
+- Latest pushed commit at handoff: `96e720c`
 - Handoff date: `2026-02-22` (UTC)
 
 ## What Is Implemented
@@ -82,10 +82,10 @@ Build an MVP prior-authorization appeal application that:
   - `ConfiguredCognitoUserPoolId = us-east-1_lJ4XChD2H`
   - `ConfiguredCognitoAppClientId = 5395vq9loa484ipjcgtr3o5lh2`
 
-### Legacy Staging Stack (not canonical)
+### Legacy Staging Stack
 - Stack: `InfraStack-staging`
-- Status: `UPDATE_ROLLBACK_COMPLETE`
-- Reason: failed in-place LB/VPC migration attempt during cutover; replaced by blue/green `InfraStack-staging-v2`.
+- Status: decommissioned/deleted
+- Notes: replaced by canonical `InfraStack-staging-v2`.
 
 ## Validation Performed (Latest Session)
 - `infra` build + tests passed.
@@ -161,10 +161,41 @@ Build an MVP prior-authorization appeal application that:
   - `NetworkStack-staging` (no changes) and `InfraStack-staging-v2` deployed successfully.
   - ECS task role now includes Bedrock invoke permissions and container env sets `BEDROCK_MODEL_ID`.
   - Added documents S3 buckets + ECS task read/write grants + `DOCUMENTS_BUCKET_NAME` env var in both dev and staging-v2.
+ - Migration credential model standardized (Phase 0.1):
+   - Added dedicated migration credential tooling:
+     - `web/scripts/provision-db-roles.mjs`
+     - `web/scripts/provision-db-roles-from-secrets.mjs`
+     - `web/scripts/run-migrations-from-secret.mjs`
+   - Added `ADMIN_DATABASE_URL` support in DB role provisioning to allow secure in-VPC one-off role setup tasks.
+   - Created/used dedicated secrets for both environments:
+     - dev: `unity-appeals-dev-db-admin`, `unity-appeals-dev-app-db-credentials`, `unity-appeals-dev-migrator-db-credentials`
+     - staging-v2: `unity-appeals-staging-v2-db-admin`, `unity-appeals-staging-v2-app-db-credentials`, `unity-appeals-staging-v2-migrator-db-credentials`
+   - Validated migrator-based migrations using one-off ECS tasks in both dev and staging-v2 (`exitCode = 0`).
+ - Export reliability and automation:
+   - Added internal processor route for scheduler use:
+     - `POST /api/internal/exports/process`
+     - token-protected via `x-export-processor-token` and `EXPORT_PROCESSOR_SHARED_SECRET`.
+   - Added periodic trigger path:
+     - EventBridge `rate(1 minute)` rule invokes stack-managed Lambda to call internal processor route.
+   - Internal processor route checks:
+     - unauthorized calls return `401` (dev + staging-v2)
+     - authorized token calls return `200` (dev + staging-v2)
+ - Automated tests added (Phase 2 slice):
+   - `web/src/lib/export-processing.test.ts`
+   - `web/src/lib/export-status.test.ts`
+   - `npm run test` now runs `node --test "src/**/*.test.ts"` in `web`.
+ - Alarm-noise hardening:
+   - Updated ECS running-task alarm missing-data behavior from `BREACHING` to `NOT_BREACHING` in both stacks.
+   - Verified both alarms are currently `OK`:
+     - `InfraStack-ecs-running-tasks-low`
+     - `InfraStack-staging-v2-ecs-running-tasks-low`
 
 ## Known Gaps / Next Priority Work
-1. Optional cleanup: old pending SNS placeholder subscriptions for `dev.user@unityappeals.local` after AWS auto-removal window.
-2. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
+1. Add API-level integration tests for chat/document route boundaries and auth failure paths.
+2. Add Bedrock regression tests for failure/guardrail paths.
+3. Add CI migration smoke against disposable DB.
+4. Optional cleanup: stale SNS pending placeholders for `dev.user@unityappeals.local` after AWS auto-removal.
+5. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
 
 ## Suggested “First Command” In Next Session
 ```bash
@@ -172,4 +203,36 @@ cd /Users/benjaminfrank/Documents/unity-appeals-mvp
 git pull
 ```
 
-Then continue with: decommission legacy `InfraStack-staging`, confirm SNS delivery evidence, and start Bedrock app path implementation.
+Then continue with: remaining Phase 2 quality work in `docs/MASTER-PLAN.md`, then Phase 3 runbook/handoff closeout tasks.
+
+## Next Chat Prompt
+```text
+Working repo: /Users/benjaminfrank/Documents/unity-appeals-mvp
+Branch: main
+
+Read docs/HANDOFF-STATE.md and docs/MASTER-PLAN.md and continue execution from there.
+
+Current canonical runtime:
+- Dev stack: InfraStack
+- Staging stack: InfraStack-staging-v2
+- Staging network stack: NetworkStack-staging
+- Legacy InfraStack-staging is decommissioned/deleted.
+
+Current state highlights:
+- AWS hardening and alarm delivery proof completed.
+- Bedrock-only generation path implemented.
+- Export pipeline is implemented end-to-end (queue process + S3 artifact + status/download route).
+- PHI guardrails are enforced on generation inputs and model outputs (422 block path).
+
+Do this next (in order):
+1. Phase 0.1: implement standardized migrator credential model for dev and staging (no ad hoc master-secret use).
+2. Update runbook/docs for the migration procedure and validate both environments.
+3. Phase 2: add automated tests for export processing and status/download routes.
+4. Add a periodic trigger path for export queue processing.
+
+Constraints:
+- Preserve tenant isolation and PHI-disabled behavior.
+- Keep endpoint policy drift checks passing.
+- Make code changes directly, run build/tests/deploy/smokes as needed, and commit/push when complete.
+- Preserve unrelated local changes.
+```

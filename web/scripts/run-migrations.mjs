@@ -5,11 +5,29 @@ import pg from "pg";
 
 const { Client } = pg;
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  console.error("DATABASE_URL is required to run migrations.");
-  process.exit(1);
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value || value.length === 0) {
+    console.error(`${name} is required to run migrations when DATABASE_URL is not set.`);
+    process.exit(1);
+  }
+  return value;
 }
+
+function buildDatabaseUrl() {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+
+  const host = requireEnv("DATABASE_HOST");
+  const port = process.env.DATABASE_PORT ?? "5432";
+  const database = requireEnv("DATABASE_NAME");
+  const user = requireEnv("DATABASE_USER");
+  const password = requireEnv("DATABASE_PASSWORD");
+  return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+}
+
+const databaseUrl = buildDatabaseUrl();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

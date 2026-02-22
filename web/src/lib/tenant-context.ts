@@ -54,7 +54,7 @@ export async function insertAuditEvent(
   db: Pool | PoolClient,
   params: {
     tenantId: string;
-    actorUserId: string;
+    actorUserId?: string | null;
     action: string;
     entityType: string;
     entityId?: string;
@@ -68,7 +68,7 @@ export async function insertAuditEvent(
     `,
     [
       params.tenantId,
-      params.actorUserId,
+      params.actorUserId ?? null,
       params.action,
       params.entityType,
       params.entityId ?? null,

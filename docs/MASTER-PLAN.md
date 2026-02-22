@@ -21,12 +21,12 @@ Estimate basis:
 Status: In progress
 
 ### 0.1 Migration privilege model (required)
-- [ ] Create/standardize a dedicated migration credential path (dev + staging) separate from app runtime user.
-- [ ] Update migration run procedure to always use migrator credentials.
-- [ ] Verify app runtime user remains least-privilege (no DDL required at runtime).
+- [x] Create/standardize a dedicated migration credential path (dev + staging) separate from app runtime user.
+- [x] Update migration run procedure to always use migrator credentials.
+- [x] Verify app runtime user remains least-privilege (no DDL required at runtime).
 
 Gate to Phase 1:
-- [ ] Migrations run successfully in both envs without using ad hoc manual master-secret workarounds.
+- [x] Migrations run successfully in both envs without using ad hoc manual master-secret workarounds.
 
 ### 0.2 Ops cleanup (optional but recommended)
 - [ ] Re-check stale `PendingConfirmation` SNS placeholders and remove if AWS exposes valid ARN; otherwise document auto-aging behavior.
@@ -58,9 +58,10 @@ Gate to Phase 2:
 - [ ] All touched routes have positive + negative smoke tests.
 
 ## Phase 2 - Quality & Reliability
-Status: Not started
+Status: In progress
 
 ### 2.1 Automated test coverage
+- [x] Automated tests for export queue processing and export status/download payload behavior.
 - [ ] API integration tests for chat and document endpoints (tenant boundaries + auth required paths).
 - [ ] Regression tests for Bedrock path error handling.
 - [ ] Migration smoke test in CI against disposable DB.
@@ -76,7 +77,7 @@ Gate to Phase 3:
 Status: Not started
 
 ### 3.1 Runbooks & handoff
-- [ ] Update `docs/INFRA-OPERATIONS.md` with migrator-credential migration flow.
+- [x] Update `docs/INFRA-OPERATIONS.md` with migrator-credential migration flow.
 - [ ] Keep `docs/HANDOFF-STATE.md` aligned with actual deployed state and known gaps.
 - [ ] Produce concise go-live checklist (deploy, migrate, smoke, rollback).
 
@@ -88,8 +89,8 @@ Gate to Done:
 - [ ] Product owner signs off on MVP acceptance criteria.
 
 ## Immediate Next 5 Tasks (strict order)
-1. Define and implement dedicated migrator credential flow (Phase 0.1).
-2. Update runbook with the new migration flow and validate in dev + staging.
+1. Define and implement dedicated migrator credential flow (Phase 0.1). ✅ completed
+2. Update runbook with the new migration flow and validate in dev + staging. ✅ completed
 3. Add Bedrock output guardrails/non-PHI validation (Phase 1.1).
-4. Add automated tests for export queue processing and download-status routes (Phase 2.1).
-5. Add periodic/scheduled trigger for `api/exports/process` worker path.
+4. Add automated tests for export queue processing and download-status routes (Phase 2.1). ✅ completed
+5. Add periodic/scheduled trigger for `api/exports/process` worker path. ✅ completed

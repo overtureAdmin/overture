@@ -1,6 +1,7 @@
 import { getAuthContextOrDevFallback, authRequiredResponse } from "@/lib/auth";
 import { getDbPool } from "@/lib/db";
 import { processOneQueuedExport } from "@/lib/export-jobs";
+import { processExportQueue } from "@/lib/export-processing";
 import { jsonError, jsonOk, parseJsonBody } from "@/lib/http";
 import { ensureTenantAndUser } from "@/lib/tenant-context";
 
@@ -24,37 +25,16 @@ export async function POST(request: Request) {
   const client = await db.connect();
   try {
     const actor = await ensureTenantAndUser(client, auth);
-    const processed: Array<{ exportId: string; outcome: string; storageKey?: string; reason?: string }> = [];
-
-    for (let i = 0; i < limit; i += 1) {
-      const result = await processOneQueuedExport({
+    const queueResult = await processExportQueue({
+      limit,
+      processOne: async () =>
+        processOneQueuedExport({
         client,
         tenantId: actor.tenantId,
         actorUserId: actor.userId,
-      });
-      if (result.outcome === "none") {
-        break;
-      }
-      if (result.outcome === "completed") {
-        processed.push({
-          exportId: result.exportId,
-          outcome: result.outcome,
-          storageKey: result.storageKey,
-        });
-      } else {
-        processed.push({
-          exportId: result.exportId,
-          outcome: result.outcome,
-          reason: result.reason,
-        });
-      }
-    }
-
-    return jsonOk({
-      requestedLimit: limit,
-      processedCount: processed.length,
-      processed,
+      }),
     });
+    return jsonOk(queueResult);
   } catch (error) {
     console.error("POST /api/exports/process failed", error);
     return jsonError("Failed to process export queue", 500);
