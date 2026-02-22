@@ -1,5 +1,10 @@
 import { getAuthContextOrDevFallback, authRequiredResponse } from "@/lib/auth";
-import { generateTextWithBedrock, getBedrockModelId } from "@/lib/bedrock";
+import {
+  BedrockGuardrailError,
+  findPhiFindings,
+  generateTextWithBedrock,
+  getBedrockModelId,
+} from "@/lib/bedrock";
 import { getDbPool } from "@/lib/db";
 import { jsonError, jsonOk, parseJsonBody } from "@/lib/http";
 import { ensureTenantAndUser, insertAuditEvent } from "@/lib/tenant-context";
@@ -29,14 +34,20 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!body || body.role !== "user" || !body.content?.trim()) {
     return jsonError("Missing required fields: role='user', content", 422);
   }
+  const trimmedContent = body.content.trim();
+  const userPhiFindings = findPhiFindings(trimmedContent);
+  if (userPhiFindings.length > 0) {
+    return jsonError("Input blocked by PHI guardrails", 422);
+  }
 
   const db = getDbPool();
   const client = await db.connect();
   const { threadId } = await params;
+  let actor: { tenantId: string; userId: string } | null = null;
   try {
     await client.query("BEGIN");
 
-    const actor = await ensureTenantAndUser(client, auth);
+    actor = await ensureTenantAndUser(client, auth);
 
     const threadResult = await client.query<{ id: string }>(
       `
@@ -60,7 +71,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         VALUES ($1::uuid, $2::uuid, $3::uuid, 'user', $4)
         RETURNING id
       `,
-      [actor.tenantId, threadId, actor.userId, body.content.trim()],
+      [actor.tenantId, threadId, actor.userId, trimmedContent],
     );
 
     const promptMessagesResult = await client.query<{ role: string; content: string }>(
@@ -128,6 +139,22 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
   } catch (error) {
     await client.query("ROLLBACK");
+    if (error instanceof BedrockGuardrailError && actor) {
+      await insertAuditEvent(client, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.userId,
+        action: "message.create.blocked",
+        entityType: "thread",
+        entityId: threadId,
+        metadata: {
+          modelId: getBedrockModelId(),
+          guardrailCode: error.code,
+          findings: error.findings,
+          phiProcessingEnabled: false,
+        },
+      });
+      return jsonError("Model output blocked by PHI guardrails", 422);
+    }
     console.error("POST /api/chat/:threadId/message failed", error);
     return jsonError("Failed to create message", 500);
   } finally {

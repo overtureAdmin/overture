@@ -1,5 +1,10 @@
 import { getAuthContextOrDevFallback, authRequiredResponse } from "@/lib/auth";
-import { generateTextWithBedrock, getBedrockModelId } from "@/lib/bedrock";
+import {
+  BedrockGuardrailError,
+  findPhiFindings,
+  generateTextWithBedrock,
+  getBedrockModelId,
+} from "@/lib/bedrock";
 import { getDbPool } from "@/lib/db";
 import { jsonError, jsonOk, parseJsonBody } from "@/lib/http";
 import { ensureTenantAndUser, insertAuditEvent } from "@/lib/tenant-context";
@@ -24,12 +29,22 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   const revisionPrompt = body.revisionPrompt.trim();
+  const promptFindings = findPhiFindings(revisionPrompt);
+  if (promptFindings.length > 0) {
+    return jsonError("Input blocked by PHI guardrails", 422);
+  }
   const { id } = await params;
   const db = getDbPool();
   const client = await db.connect();
+  let actor: { tenantId: string; userId: string } | null = null;
+  let baseDocumentContext: {
+    id: string;
+    thread_id: string;
+    kind: "lmn" | "appeal" | "p2p";
+  } | null = null;
   try {
     await client.query("BEGIN");
-    const actor = await ensureTenantAndUser(client, auth);
+    actor = await ensureTenantAndUser(client, auth);
 
     const baseDocumentResult = await client.query<{
       id: string;
@@ -52,6 +67,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       await client.query("ROLLBACK");
       return jsonError("Document not found", 404);
     }
+    baseDocumentContext = {
+      id: baseDocument.id,
+      thread_id: baseDocument.thread_id,
+      kind: baseDocument.kind,
+    };
 
     const revisedContent = await generateTextWithBedrock({
       systemPrompt:
@@ -114,6 +134,24 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
   } catch (error) {
     await client.query("ROLLBACK");
+    if (error instanceof BedrockGuardrailError && actor && baseDocumentContext) {
+      await insertAuditEvent(client, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.userId,
+        action: "document.revise.blocked",
+        entityType: "generated_document",
+        entityId: baseDocumentContext.id,
+        metadata: {
+          threadId: baseDocumentContext.thread_id,
+          kind: baseDocumentContext.kind,
+          modelId: getBedrockModelId(),
+          guardrailCode: error.code,
+          findings: error.findings,
+          phiProcessingEnabled: false,
+        },
+      });
+      return jsonError("Revised draft blocked by PHI guardrails", 422);
+    }
     console.error("POST /api/documents/:id/revise failed", error);
     return jsonError("Failed to revise document", 500);
   } finally {

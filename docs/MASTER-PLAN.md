@@ -39,9 +39,9 @@ Gate to Phase 1:
 Status: In progress
 
 ### 1.1 Bedrock response hardening
-- [ ] Add stricter system prompts and output constraints for chat/doc generation.
-- [ ] Add explicit non-PHI output checks prior to persistence.
-- [ ] Add failure behavior for empty/unsafe model outputs.
+- [x] Add stricter system prompts and output constraints for chat/doc generation.
+- [x] Add explicit non-PHI output checks prior to persistence.
+- [x] Add failure behavior for empty/unsafe model outputs.
 
 ### 1.2 Document export pipeline (critical functional gap)
 - [x] Implement export worker/processor for queued `generated_document_export` rows.

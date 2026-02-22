@@ -1,5 +1,10 @@
 import { getAuthContextOrDevFallback, authRequiredResponse } from "@/lib/auth";
-import { generateTextWithBedrock, getBedrockModelId } from "@/lib/bedrock";
+import {
+  BedrockGuardrailError,
+  findPhiFindings,
+  generateTextWithBedrock,
+  getBedrockModelId,
+} from "@/lib/bedrock";
 import { getDbPool } from "@/lib/db";
 import { jsonError, jsonOk, parseJsonBody } from "@/lib/http";
 import { ensureTenantAndUser, insertAuditEvent } from "@/lib/tenant-context";
@@ -23,15 +28,22 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!body || !["lmn", "appeal", "p2p"].includes(body.kind)) {
     return jsonError("Missing required field: kind (lmn|appeal|p2p)", 422);
   }
+  if (body.instructions?.trim()) {
+    const instructionFindings = findPhiFindings(body.instructions.trim());
+    if (instructionFindings.length > 0) {
+      return jsonError("Input blocked by PHI guardrails", 422);
+    }
+  }
 
   const kind = body.kind;
   const { id } = await params;
   const db = getDbPool();
   const client = await db.connect();
+  let actor: { tenantId: string; userId: string } | null = null;
 
   try {
     await client.query("BEGIN");
-    const actor = await ensureTenantAndUser(client, auth);
+    actor = await ensureTenantAndUser(client, auth);
 
     const threadResult = await client.query<{ id: string }>(
       `
@@ -61,6 +73,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       `,
       [actor.tenantId, id],
     );
+    const latestMessage = latestMessageResult.rows[0]?.content ?? "";
+    const contextFindings = latestMessage ? findPhiFindings(latestMessage) : [];
+    if (contextFindings.length > 0) {
+      await client.query("ROLLBACK");
+      return jsonError("Thread context blocked by PHI guardrails", 422);
+    }
 
     const latestVersionResult = await client.query<{ max_version: number | null }>(
       `
@@ -81,7 +99,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         `Document kind: ${kind}`,
         `Thread ID: ${id}`,
         `User instructions: ${body.instructions?.trim() || "None provided."}`,
-        `Latest user message context: ${latestMessageResult.rows[0]?.content ?? "No prior thread messages."}`,
+        `Latest user message context: ${latestMessage || "No prior thread messages."}`,
       ].join("\n"),
       temperature: 0.2,
     });
@@ -128,6 +146,23 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
   } catch (error) {
     await client.query("ROLLBACK");
+    if (error instanceof BedrockGuardrailError && actor) {
+      await insertAuditEvent(client, {
+        tenantId: actor.tenantId,
+        actorUserId: actor.userId,
+        action: "document.generate.blocked",
+        entityType: "thread",
+        entityId: id,
+        metadata: {
+          kind,
+          modelId: getBedrockModelId(),
+          guardrailCode: error.code,
+          findings: error.findings,
+          phiProcessingEnabled: false,
+        },
+      });
+      return jsonError("Generated draft blocked by PHI guardrails", 422);
+    }
     console.error("POST /api/documents/:id/generate failed", error);
     return jsonError("Failed to generate document", 500);
   } finally {

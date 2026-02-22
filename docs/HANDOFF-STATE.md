@@ -151,6 +151,11 @@ Build an MVP prior-authorization appeal application that:
     - Export status/download route: `GET /api/documents/:id/export/:exportId` (returns status + presigned S3 URL when complete).
     - Artifact generation implemented for `.pdf` and `.docx`, with S3 persistence in per-environment documents buckets.
     - Dev smoke and staging-v2 smoke confirmed `queued -> completed` plus valid download URLs.
+  - Bedrock guardrails hardened:
+    - Added centralized PHI-pattern detection + non-PHI policy prompt in `web/src/lib/bedrock.ts`.
+    - Chat/generate/revise now block PHI-like user input (`422`) before persistence/model invocation.
+    - Model output guardrail violations now return `422` and write blocked audit events instead of persisting unsafe text.
+    - Post-deploy smokes verified PHI-like chat input is blocked in both dev and staging-v2.
 - Infra deployment updates:
   - `InfraStack` deployed successfully.
   - `NetworkStack-staging` (no changes) and `InfraStack-staging-v2` deployed successfully.
