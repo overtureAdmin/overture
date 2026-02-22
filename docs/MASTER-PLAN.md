@@ -87,9 +87,8 @@ Status: In progress
 - [x] Explicit PHI gate status remains disabled unless compliance approval is documented.
 
 Gate to Done:
-- [ ] Product owner signs off on MVP acceptance criteria.
+- [x] Product owner signs off on MVP acceptance criteria.
 
 ## Immediate Next 5 Tasks (strict order)
-1. Obtain product owner MVP acceptance signoff (Gate to Done).
-2. Execute deferred stale SNS placeholder cleanup in post-launch hardening window (Phase 0.2).
-3. Execute deferred superseded log-group cleanup in post-launch hardening window (Phase 0.2).
+1. Execute deferred stale SNS placeholder cleanup in post-launch hardening window (Phase 0.2).
+2. Execute deferred superseded log-group cleanup in post-launch hardening window (Phase 0.2).

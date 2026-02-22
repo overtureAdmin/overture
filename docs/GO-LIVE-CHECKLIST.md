@@ -58,5 +58,5 @@ Last updated: 2026-02-22
 
 ## Signoff
 
-- [ ] Staging-v2 workflow signoff completed (thread -> chat -> generate -> revise -> export -> download/status).
-- [ ] Product owner MVP acceptance recorded.
+- [x] Staging-v2 workflow signoff completed (thread -> chat -> generate -> revise -> export -> download/status).
+- [x] Product owner MVP acceptance recorded (`2026-02-22T21:26:40Z`, approver: Benjamin Frank, CEO).

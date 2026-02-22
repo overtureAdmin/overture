@@ -128,6 +128,10 @@ Build an MVP prior-authorization appeal application that:
 - `ba86b5f` feat: standardize db migrator flow and schedule export processing
 
 ## Latest Session Updates (`2026-02-22`)
+- Product-owner MVP acceptance recorded:
+  - Approver: Benjamin Frank, CEO.
+  - Timestamp: `2026-02-22T21:26:40Z` (UTC).
+  - Scope accepted: staging-v2 end-to-end workflow, PHI-disabled posture, and launch-readiness checklist completion.
 - Phase 3.2 staging-v2 end-to-end signoff executed with concrete evidence (`2026-02-22T21:22:14Z` UTC):
   - `POST /api/threads` created thread `21fc7a16-b9ba-4c8d-8387-aa9f7d3bf5f3`.
   - `POST /api/chat/:threadId/message` created assistant message `f5fe5105-94c9-4609-add3-6b8efd452ed3`.
@@ -242,9 +246,8 @@ Build an MVP prior-authorization appeal application that:
      - `InfraStack-staging-v2-ecs-running-tasks-low`
 
 ## Known Gaps / Next Priority Work
-1. Obtain product-owner MVP acceptance signoff.
-2. Execute deferred post-launch cleanup item: stale SNS pending placeholders for `dev.user@unityappeals.local` (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
-3. Execute deferred post-launch cleanup item: superseded log groups with `retentionInDays = None` where safe (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
+1. Execute deferred post-launch cleanup item: stale SNS pending placeholders for `dev.user@unityappeals.local` (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
+2. Execute deferred post-launch cleanup item: superseded log groups with `retentionInDays = None` where safe (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
 
 ## Suggested “First Command” In Next Session
 ```bash
@@ -252,7 +255,7 @@ cd /Users/benjaminfrank/Documents/unity-appeals-mvp
 git pull
 ```
 
-Then continue with: final acceptance and product signoff activities in `docs/MASTER-PLAN.md`.
+Then continue with: deferred post-launch hardening items from `docs/MASTER-PLAN.md` Phase 0.2.
 
 ## Next Chat Prompt
 ```text
@@ -278,8 +281,8 @@ Current state highlights:
 - CI migration smoke workflow is in place.
 
 Do this next (in order):
-1. Obtain product owner MVP acceptance signoff.
-2. Schedule deferred post-launch cleanup execution for SNS pending placeholders and superseded log groups.
+1. Execute deferred post-launch cleanup for SNS pending placeholders in approved hardening window.
+2. Execute deferred post-launch cleanup for superseded log groups in approved hardening window.
 
 Constraints:
 - Preserve tenant isolation and PHI-disabled behavior.
