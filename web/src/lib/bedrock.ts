@@ -40,13 +40,14 @@ export function findPhiFindings(text: string): string[] {
 }
 
 export class BedrockGuardrailError extends Error {
-  constructor(
-    public readonly code: "EMPTY_OUTPUT" | "PHI_DETECTED",
-    message: string,
-    public readonly findings: string[] = [],
-  ) {
+  public readonly code: "EMPTY_OUTPUT" | "PHI_DETECTED";
+  public readonly findings: string[];
+
+  constructor(code: "EMPTY_OUTPUT" | "PHI_DETECTED", message: string, findings: string[] = []) {
     super(message);
     this.name = "BedrockGuardrailError";
+    this.code = code;
+    this.findings = findings;
   }
 }
 

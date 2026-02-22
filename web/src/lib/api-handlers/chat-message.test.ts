@@ -129,3 +129,84 @@ test("chat handler enforces tenant-boundary by returning 404 when thread is not 
   });
   assert.equal(response.status, 404);
 });
+
+test("chat handler returns 422 when Bedrock guardrail blocks output", async () => {
+  const guardrailError = { code: "PHI_DETECTED", findings: ["email"] };
+  let auditAction: string | null = null;
+  const client = {
+    async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {
+      if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
+        return { rows: [{ id: "thread" }] as T[] };
+      }
+      if (sql.includes("INSERT INTO message") && sql.includes("RETURNING id")) {
+        return { rows: [{ id: "m1" }] as T[] };
+      }
+      if (sql.includes("SELECT role, content")) {
+        return { rows: [{ role: "user", content: "hello" }] as T[] };
+      }
+      return { rows: [] as T[] };
+    },
+    release() {},
+  };
+  const handle = createChatMessageHandler(
+    baseDeps({
+      getDbPool() {
+        return {
+          async connect() {
+            return client;
+          },
+        };
+      },
+      async generateTextWithBedrock() {
+        throw guardrailError;
+      },
+      isBedrockGuardrailError(error): error is { code: string; findings: string[] } {
+        return error === guardrailError;
+      },
+      async insertAuditEvent(_db, params) {
+        auditAction = params.action;
+      },
+    }),
+  );
+  const response = await handle(new Request("http://localhost/api/chat"), {
+    params: Promise.resolve({ threadId: "22222222-2222-2222-2222-222222222222" }),
+  });
+  assert.equal(response.status, 422);
+  assert.equal(auditAction, "message.create.blocked");
+});
+
+test("chat handler returns 500 for non-guardrail Bedrock errors", async () => {
+  const client = {
+    async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {
+      if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
+        return { rows: [{ id: "thread" }] as T[] };
+      }
+      if (sql.includes("INSERT INTO message") && sql.includes("RETURNING id")) {
+        return { rows: [{ id: "m1" }] as T[] };
+      }
+      if (sql.includes("SELECT role, content")) {
+        return { rows: [{ role: "user", content: "hello" }] as T[] };
+      }
+      return { rows: [] as T[] };
+    },
+    release() {},
+  };
+  const handle = createChatMessageHandler(
+    baseDeps({
+      getDbPool() {
+        return {
+          async connect() {
+            return client;
+          },
+        };
+      },
+      async generateTextWithBedrock() {
+        throw new Error("bedrock down");
+      },
+    }),
+  );
+  const response = await handle(new Request("http://localhost/api/chat"), {
+    params: Promise.resolve({ threadId: "22222222-2222-2222-2222-222222222222" }),
+  });
+  assert.equal(response.status, 500);
+});

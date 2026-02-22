@@ -133,3 +133,84 @@ test("document generate handler enforces tenant-boundary by returning 404 when t
   });
   assert.equal(response.status, 404);
 });
+
+test("document generate handler returns 422 when Bedrock guardrail blocks output", async () => {
+  const guardrailError = { code: "PHI_DETECTED", findings: ["phone"] };
+  let auditAction: string | null = null;
+  const client = {
+    async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {
+      if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
+        return { rows: [{ id: "thread" }] as T[] };
+      }
+      if (sql.includes("SELECT content") && sql.includes("FROM message")) {
+        return { rows: [{ content: "latest context" }] as T[] };
+      }
+      if (sql.includes("SELECT MAX(version)")) {
+        return { rows: [{ max_version: 1 }] as T[] };
+      }
+      return { rows: [] as T[] };
+    },
+    release() {},
+  };
+  const handle = createDocumentGenerateHandler(
+    baseDeps({
+      getDbPool() {
+        return {
+          async connect() {
+            return client;
+          },
+        };
+      },
+      async generateTextWithBedrock() {
+        throw guardrailError;
+      },
+      isBedrockGuardrailError(error): error is { code: string; findings: string[] } {
+        return error === guardrailError;
+      },
+      async insertAuditEvent(_db, params) {
+        auditAction = params.action;
+      },
+    }),
+  );
+  const response = await handle(new Request("http://localhost/api/documents/id/generate"), {
+    params: Promise.resolve({ id: "33333333-3333-3333-3333-333333333333" }),
+  });
+  assert.equal(response.status, 422);
+  assert.equal(auditAction, "document.generate.blocked");
+});
+
+test("document generate handler returns 500 for non-guardrail Bedrock errors", async () => {
+  const client = {
+    async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {
+      if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
+        return { rows: [{ id: "thread" }] as T[] };
+      }
+      if (sql.includes("SELECT content") && sql.includes("FROM message")) {
+        return { rows: [{ content: "latest context" }] as T[] };
+      }
+      if (sql.includes("SELECT MAX(version)")) {
+        return { rows: [{ max_version: 1 }] as T[] };
+      }
+      return { rows: [] as T[] };
+    },
+    release() {},
+  };
+  const handle = createDocumentGenerateHandler(
+    baseDeps({
+      getDbPool() {
+        return {
+          async connect() {
+            return client;
+          },
+        };
+      },
+      async generateTextWithBedrock() {
+        throw new Error("bedrock timeout");
+      },
+    }),
+  );
+  const response = await handle(new Request("http://localhost/api/documents/id/generate"), {
+    params: Promise.resolve({ id: "33333333-3333-3333-3333-333333333333" }),
+  });
+  assert.equal(response.status, 500);
+});
