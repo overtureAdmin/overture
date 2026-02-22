@@ -83,15 +83,13 @@ Status: In progress
 - [x] Produce concise go-live checklist (deploy, migrate, smoke, rollback).
 
 ### 3.2 Final acceptance
-- [ ] Staging signoff on complete workflow.
-- [ ] Explicit PHI gate status remains disabled unless compliance approval is documented.
+- [x] Staging signoff on complete workflow.
+- [x] Explicit PHI gate status remains disabled unless compliance approval is documented.
 
 Gate to Done:
 - [ ] Product owner signs off on MVP acceptance criteria.
 
 ## Immediate Next 5 Tasks (strict order)
-1. Execute staging-v2 end-to-end signoff run and record evidence in docs (Phase 3.2).
-2. Confirm PHI gate remains disabled and capture explicit compliance gate status in final acceptance notes (Phase 3.2).
-3. Decide execute-vs-defer timing for stale SNS placeholder cleanup and record owner/date (Phase 0.2).
-4. Decide execute-vs-defer timing for superseded log-group cleanup and record owner/date (Phase 0.2).
-5. Obtain product owner MVP acceptance signoff (Gate to Done).
+1. Obtain product owner MVP acceptance signoff (Gate to Done).
+2. Execute deferred stale SNS placeholder cleanup in post-launch hardening window (Phase 0.2).
+3. Execute deferred superseded log-group cleanup in post-launch hardening window (Phase 0.2).

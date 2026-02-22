@@ -15,7 +15,7 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest pushed commit at handoff: `e2e53a8`
+- Latest pushed commit at handoff: `9757d3a`
 - Handoff date: `2026-02-22` (UTC)
 
 ## What Is Implemented
@@ -128,6 +128,21 @@ Build an MVP prior-authorization appeal application that:
 - `ba86b5f` feat: standardize db migrator flow and schedule export processing
 
 ## Latest Session Updates (`2026-02-22`)
+- Phase 3.2 staging-v2 end-to-end signoff executed with concrete evidence (`2026-02-22T21:22:14Z` UTC):
+  - `POST /api/threads` created thread `21fc7a16-b9ba-4c8d-8387-aa9f7d3bf5f3`.
+  - `POST /api/chat/:threadId/message` created assistant message `f5fe5105-94c9-4609-add3-6b8efd452ed3`.
+  - `POST /api/documents/:threadId/generate` created document `e3a44fa3-e538-4bee-ab0f-d344e2bc85a0`.
+  - `POST /api/documents/:id/revise` created revised document `202f872f-a6f4-48fd-8c9c-f223e71ef651`.
+  - `POST /api/documents/:id/export` queued export `14c4276f-6fa3-430b-9744-1c3d4792bc60`.
+  - `POST /api/internal/exports/process` unauthorized call returned `401`; authorized token call returned `200`.
+  - `GET /api/documents/:id/export/:exportId` reached `status=completed` with `downloadUrl` present.
+- PHI/compliance gate status explicitly reaffirmed:
+  - PHI processing remains disabled in runtime paths.
+  - No compliance approval enabling PHI has been recorded as of `2026-02-22`.
+- Optional Phase 0.2 cleanup ownership/date documented:
+  - Owner: Engineering.
+  - Target window: first post-launch hardening cycle (`2026-03-01` to `2026-03-15` UTC).
+  - Scope: stale SNS `PendingConfirmation` placeholders and superseded log groups with undefined retention.
 - Phase 2.1 API integration coverage completed for auth + tenant boundaries:
   - Added API handler tests:
     - `web/src/lib/api-handlers/document-revise.test.ts`
@@ -227,11 +242,9 @@ Build an MVP prior-authorization appeal application that:
      - `InfraStack-staging-v2-ecs-running-tasks-low`
 
 ## Known Gaps / Next Priority Work
-1. Execute and document staging-v2 end-to-end workflow signoff (`thread -> chat -> generate -> revise -> export -> download/status`).
-2. Keep PHI gate status explicitly disabled until compliance approval is documented.
-3. Optional cleanup (deferred post-launch): stale SNS pending placeholders for `dev.user@unityappeals.local`.
-4. Optional cleanup (deferred post-launch): old log groups from superseded stacks with `retentionInDays = None`.
-5. Obtain product-owner MVP acceptance signoff.
+1. Obtain product-owner MVP acceptance signoff.
+2. Execute deferred post-launch cleanup item: stale SNS pending placeholders for `dev.user@unityappeals.local` (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
+3. Execute deferred post-launch cleanup item: superseded log groups with `retentionInDays = None` where safe (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
 
 ## Suggested “First Command” In Next Session
 ```bash
@@ -239,7 +252,7 @@ cd /Users/benjaminfrank/Documents/unity-appeals-mvp
 git pull
 ```
 
-Then continue with: Phase 3.2 staging signoff + final acceptance activities in `docs/MASTER-PLAN.md`.
+Then continue with: final acceptance and product signoff activities in `docs/MASTER-PLAN.md`.
 
 ## Next Chat Prompt
 ```text
@@ -265,10 +278,8 @@ Current state highlights:
 - CI migration smoke workflow is in place.
 
 Do this next (in order):
-1. Execute staging-v2 end-to-end workflow signoff and capture evidence in docs.
-2. Confirm/document PHI gate remains disabled pending compliance approval.
-3. Decide/record owner + date for deferred optional cleanup items (SNS pending placeholders, superseded log groups).
-4. Obtain product owner MVP acceptance signoff.
+1. Obtain product owner MVP acceptance signoff.
+2. Schedule deferred post-launch cleanup execution for SNS pending placeholders and superseded log groups.
 
 Constraints:
 - Preserve tenant isolation and PHI-disabled behavior.
