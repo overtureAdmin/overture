@@ -155,7 +155,9 @@ export function createDocumentGenerateHandler(deps: DocumentGenerateDeps) {
         entityType: "generated_document",
         entityId: document.id,
         metadata: {
+          outcome: "success",
           threadId: id,
+          documentId: document.id,
           kind,
           version: nextVersion,
           modelId: deps.getBedrockModelId(),
@@ -185,6 +187,7 @@ export function createDocumentGenerateHandler(deps: DocumentGenerateDeps) {
           entityType: "thread",
           entityId: id,
           metadata: {
+            outcome: "blocked",
             kind,
             modelId: deps.getBedrockModelId(),
             guardrailCode: error.code,

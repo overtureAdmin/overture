@@ -31,9 +31,10 @@ Gate to Phase 1:
 ### 0.2 Ops cleanup (optional but recommended)
 - [ ] Re-check stale `PendingConfirmation` SNS placeholders and remove if AWS exposes valid ARN; otherwise document auto-aging behavior.
 - [ ] Remove superseded log groups with undefined retention where safe.
+- [x] Defer optional cleanup items to post-launch hardening (documented in handoff state on 2026-02-22).
 
 Gate to Phase 1:
-- [ ] Optional cleanup either completed or explicitly deferred in this file.
+- [x] Optional cleanup either completed or explicitly deferred in this file.
 
 ## Phase 1 - Core App Completion (primary build)
 Status: In progress
@@ -50,19 +51,19 @@ Status: In progress
 - [x] Add API for export retrieval/status.
 
 ### 1.3 Audit/compliance trail completeness
-- [ ] Ensure `generate/revise/export` write consistent audit metadata for tenant, actor, model, and outcome.
-- [ ] Verify tenant isolation enforcement in every read/write path touched.
+- [x] Ensure `generate/revise/export` write consistent audit metadata for tenant, actor, model, and outcome.
+- [x] Verify tenant isolation enforcement in every read/write path touched.
 
 Gate to Phase 2:
-- [ ] End-to-end document lifecycle works: generate -> revise -> export -> download/status.
-- [ ] All touched routes have positive + negative smoke tests.
+- [x] End-to-end document lifecycle works: generate -> revise -> export -> download/status.
+- [x] All touched routes have positive + negative smoke tests.
 
 ## Phase 2 - Quality & Reliability
 Status: In progress
 
 ### 2.1 Automated test coverage
 - [x] Automated tests for export queue processing and export status/download payload behavior.
-- [ ] API integration tests for chat and document endpoints (tenant boundaries + auth required paths).
+- [x] API integration tests for chat and document endpoints (tenant boundaries + auth required paths).
 - [x] Regression tests for Bedrock path error handling.
 - [x] Migration smoke test in CI against disposable DB.
 
@@ -71,15 +72,15 @@ Status: In progress
 - [x] Alarm validation script for periodic ALARM/OK synthetic checks.
 
 Gate to Phase 3:
-- [ ] CI and smoke suite consistently green.
+- [x] CI and smoke suite consistently green.
 
 ## Phase 3 - Launch Readiness
-Status: Not started
+Status: In progress
 
 ### 3.1 Runbooks & handoff
 - [x] Update `docs/INFRA-OPERATIONS.md` with migrator-credential migration flow.
-- [ ] Keep `docs/HANDOFF-STATE.md` aligned with actual deployed state and known gaps.
-- [ ] Produce concise go-live checklist (deploy, migrate, smoke, rollback).
+- [x] Keep `docs/HANDOFF-STATE.md` aligned with actual deployed state and known gaps.
+- [x] Produce concise go-live checklist (deploy, migrate, smoke, rollback).
 
 ### 3.2 Final acceptance
 - [ ] Staging signoff on complete workflow.
@@ -89,8 +90,8 @@ Gate to Done:
 - [ ] Product owner signs off on MVP acceptance criteria.
 
 ## Immediate Next 5 Tasks (strict order)
-1. Add API integration tests for chat/document auth and tenant boundary behavior (Phase 2.1).
-2. Validate/complete audit metadata consistency across generate/revise/export (Phase 1.3).
-3. Keep `docs/HANDOFF-STATE.md` aligned with every material runtime/test/deploy change (Phase 3.1).
-4. Produce go-live checklist (deploy, migrate, smoke, rollback) in docs (Phase 3.1).
-5. Decide and document defer/execute status for optional SNS placeholder + legacy log-group cleanup (Phase 0.2).
+1. Execute staging-v2 end-to-end signoff run and record evidence in docs (Phase 3.2).
+2. Confirm PHI gate remains disabled and capture explicit compliance gate status in final acceptance notes (Phase 3.2).
+3. Decide execute-vs-defer timing for stale SNS placeholder cleanup and record owner/date (Phase 0.2).
+4. Decide execute-vs-defer timing for superseded log-group cleanup and record owner/date (Phase 0.2).
+5. Obtain product owner MVP acceptance signoff (Gate to Done).

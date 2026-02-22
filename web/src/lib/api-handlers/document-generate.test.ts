@@ -137,6 +137,7 @@ test("document generate handler enforces tenant-boundary by returning 404 when t
 test("document generate handler returns 422 when Bedrock guardrail blocks output", async () => {
   const guardrailError = { code: "PHI_DETECTED", findings: ["phone"] };
   let auditAction: string | null = null;
+  let auditMetadata: Record<string, unknown> | undefined;
   const client = {
     async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {
       if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
@@ -169,6 +170,7 @@ test("document generate handler returns 422 when Bedrock guardrail blocks output
       },
       async insertAuditEvent(_db, params) {
         auditAction = params.action;
+        auditMetadata = params.metadata;
       },
     }),
   );
@@ -177,6 +179,9 @@ test("document generate handler returns 422 when Bedrock guardrail blocks output
   });
   assert.equal(response.status, 422);
   assert.equal(auditAction, "document.generate.blocked");
+  assert.equal(auditMetadata?.outcome, "blocked");
+  assert.equal(auditMetadata?.modelId, "model");
+  assert.equal(auditMetadata?.phiProcessingEnabled, false);
 });
 
 test("document generate handler returns 500 for non-guardrail Bedrock errors", async () => {
@@ -213,4 +218,48 @@ test("document generate handler returns 500 for non-guardrail Bedrock errors", a
     params: Promise.resolve({ id: "33333333-3333-3333-3333-333333333333" }),
   });
   assert.equal(response.status, 500);
+});
+
+test("document generate handler writes consistent audit metadata on success", async () => {
+  let auditMetadata: Record<string, unknown> | undefined;
+  const client = {
+    async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {
+      if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
+        return { rows: [{ id: "thread" }] as T[] };
+      }
+      if (sql.includes("SELECT content") && sql.includes("FROM message")) {
+        return { rows: [{ content: "latest context" }] as T[] };
+      }
+      if (sql.includes("SELECT MAX(version)")) {
+        return { rows: [{ max_version: 1 }] as T[] };
+      }
+      if (sql.includes("INSERT INTO generated_document") && sql.includes("RETURNING id, created_at")) {
+        return { rows: [{ id: "doc-2", created_at: "2026-01-01T00:00:00Z" }] as T[] };
+      }
+      return { rows: [] as T[] };
+    },
+    release() {},
+  };
+  const handle = createDocumentGenerateHandler(
+    baseDeps({
+      getDbPool() {
+        return {
+          async connect() {
+            return client;
+          },
+        };
+      },
+      async insertAuditEvent(_db, params) {
+        auditMetadata = params.metadata;
+      },
+    }),
+  );
+  const response = await handle(new Request("http://localhost/api/documents/id/generate"), {
+    params: Promise.resolve({ id: "33333333-3333-3333-3333-333333333333" }),
+  });
+  assert.equal(response.status, 201);
+  assert.equal(auditMetadata?.outcome, "success");
+  assert.equal(auditMetadata?.documentId, "doc-2");
+  assert.equal(auditMetadata?.modelId, "model");
+  assert.equal(auditMetadata?.phiProcessingEnabled, false);
 });

@@ -88,17 +88,17 @@ Build an MVP prior-authorization appeal application that:
 - Notes: replaced by canonical `InfraStack-staging-v2`.
 
 ## Validation Performed (Latest Session)
-- `infra` build + tests passed.
-- Deployed `InfraStack` successfully.
-- Deployed `NetworkStack-staging` + `InfraStack-staging-v2` successfully.
-- Ran staging-v2 DB migrations via one-off ECS task (exit code `0`).
-- Seeded staging-v2 Cognito test user successfully.
-- Authenticated ALB API smoke tests passed:
-  - dev `GET /api/threads` => `200 OK`
-  - staging-v2 `GET /api/threads` => `200 OK`
-- ECS services verified steady state with rollout `COMPLETED` in both envs.
-- Endpoint policy `apply` and `check` both pass.
-- Synthetic alarm state transitions (`ALARM` then `OK`) executed successfully for dev and staging-v2 alarm names.
+- `cd infra && npm run build` passed.
+- `cd infra && npm run test` passed.
+- `cd web && npm run build` passed.
+- `cd web && npm run test` passed.
+- `cd infra && npm run check:endpoint-policies` passed.
+- CI migration-smoke parity passed against disposable Postgres:
+  - migration run pass 1: applied `0001_init.sql`, `0002_generated_document_export.sql`
+  - migration run pass 2: both migrations skipped (idempotent)
+  - schema verification: `migration smoke passed`
+- `cd infra && npm run smoke:runtime` passed (`dev` + `staging`).
+- `cd infra && npm run smoke:alarms` passed (`InfraStack-alb-target-5xx`, `InfraStack-staging-v2-alb-target-5xx`).
 
 ## Important Files
 - Infra:
@@ -128,6 +128,27 @@ Build an MVP prior-authorization appeal application that:
 - `ba86b5f` feat: standardize db migrator flow and schedule export processing
 
 ## Latest Session Updates (`2026-02-22`)
+- Phase 2.1 API integration coverage completed for auth + tenant boundaries:
+  - Added API handler tests:
+    - `web/src/lib/api-handlers/document-revise.test.ts`
+    - `web/src/lib/api-handlers/document-export.test.ts`
+    - `web/src/lib/api-handlers/document-export-status.test.ts`
+  - Extended generate coverage:
+    - `web/src/lib/api-handlers/document-generate.test.ts` now verifies audit metadata consistency keys.
+  - Route handlers were normalized to testable injected-handler structure:
+    - `web/src/app/api/documents/[id]/revise/route.ts`
+    - `web/src/app/api/documents/[id]/export/route.ts`
+    - `web/src/app/api/documents/[id]/export/[exportId]/route.ts`
+  - Added handler modules:
+    - `web/src/lib/api-handlers/document-revise.ts`
+    - `web/src/lib/api-handlers/document-export.ts`
+    - `web/src/lib/api-handlers/document-export-status.ts`
+- Phase 1.3 audit metadata consistency tightened for generate/revise/export:
+  - Generate + revise + export audit metadata now consistently include outcome + context fields and explicit `phiProcessingEnabled`.
+  - Export audit events now include thread/kind/version context and `modelId: null` for explicit non-model path.
+- Phase 3.1 launch readiness docs completed:
+  - Added `docs/GO-LIVE-CHECKLIST.md` with deploy/migrate/smoke/rollback checklist.
+  - Updated `docs/MASTER-PLAN.md` to mark completed Phase 1.3, 2.1, and 3.1 items and set Phase 3 status to in progress.
 - Legacy non-canonical stack decommissioned:
   - `InfraStack-staging` deleted.
   - Post-delete status check now returns `ValidationError: Stack with id InfraStack-staging does not exist`.
@@ -206,11 +227,11 @@ Build an MVP prior-authorization appeal application that:
      - `InfraStack-staging-v2-ecs-running-tasks-low`
 
 ## Known Gaps / Next Priority Work
-1. Add API-level integration tests for chat/document route boundaries and auth failure paths.
-2. Finalize audit/compliance trail consistency checks for generate/revise/export metadata.
-3. Produce launch/go-live checklist and finalize Phase 3 handoff docs.
-4. Optional cleanup: stale SNS pending placeholders for `dev.user@unityappeals.local` after AWS auto-removal.
-5. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
+1. Execute and document staging-v2 end-to-end workflow signoff (`thread -> chat -> generate -> revise -> export -> download/status`).
+2. Keep PHI gate status explicitly disabled until compliance approval is documented.
+3. Optional cleanup (deferred post-launch): stale SNS pending placeholders for `dev.user@unityappeals.local`.
+4. Optional cleanup (deferred post-launch): old log groups from superseded stacks with `retentionInDays = None`.
+5. Obtain product-owner MVP acceptance signoff.
 
 ## Suggested “First Command” In Next Session
 ```bash
@@ -218,7 +239,7 @@ cd /Users/benjaminfrank/Documents/unity-appeals-mvp
 git pull
 ```
 
-Then continue with: remaining Phase 2 quality work in `docs/MASTER-PLAN.md`, then Phase 3 runbook/handoff closeout tasks.
+Then continue with: Phase 3.2 staging signoff + final acceptance activities in `docs/MASTER-PLAN.md`.
 
 ## Next Chat Prompt
 ```text
@@ -244,10 +265,10 @@ Current state highlights:
 - CI migration smoke workflow is in place.
 
 Do this next (in order):
-1. Complete remaining Phase 2 API integration tests for chat/document auth + tenant boundary coverage.
-2. Verify and tighten Phase 1.3 audit metadata consistency for generate/revise/export paths.
-3. Update launch-readiness docs (go-live checklist + handoff alignment) and close Phase 3.1 items.
-4. Run full validation (build/tests/CI-smoke/runtime-smoke/alarm-smoke) and update docs with results.
+1. Execute staging-v2 end-to-end workflow signoff and capture evidence in docs.
+2. Confirm/document PHI gate remains disabled pending compliance approval.
+3. Decide/record owner + date for deferred optional cleanup items (SNS pending placeholders, superseded log groups).
+4. Obtain product owner MVP acceptance signoff.
 
 Constraints:
 - Preserve tenant isolation and PHI-disabled behavior.
