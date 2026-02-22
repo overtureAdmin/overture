@@ -15,7 +15,7 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest pushed commit at handoff: `7ce39af`
+- Latest pushed commit at handoff: `ba7f023`
 - Handoff date: `2026-02-22` (UTC)
 
 ## What Is Implemented
@@ -54,8 +54,8 @@ Build an MVP prior-authorization appeal application that:
   - staging-v2: retention 14 days, backup window `04:00-05:00`, maintenance `sun:05:00-sun:06:00`, PI enabled
 
 ### Web App / APIs
-- Required frontend routes scaffolded:
-  - `/login`, `/app`, `/document/[id]`
+- Frontend status:
+  - `/login`, `/app`, `/document/[id]` exist but are still scaffold/placeholder UI (not full production UX).
 - Required API endpoints scaffolded.
 - Real DB-backed implementations (tenant-scoped):
   - `GET /api/threads`
@@ -128,6 +128,9 @@ Build an MVP prior-authorization appeal application that:
 - `ba86b5f` feat: standardize db migrator flow and schedule export processing
 
 ## Latest Session Updates (`2026-02-22`)
+- Post-MVP planning handoff prepared:
+  - Phase 4 (App Build) added to `docs/MASTER-PLAN.md`.
+  - Planning priority set to frontend productization (`/app` + `/document/[id]` live API wiring and UX completion).
 - Product-owner MVP acceptance recorded:
   - Approver: Benjamin Frank, CEO.
   - Timestamp: `2026-02-22T21:26:40Z` (UTC).
@@ -246,8 +249,9 @@ Build an MVP prior-authorization appeal application that:
      - `InfraStack-staging-v2-ecs-running-tasks-low`
 
 ## Known Gaps / Next Priority Work
-1. Execute deferred post-launch cleanup item: stale SNS pending placeholders for `dev.user@unityappeals.local` (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
-2. Execute deferred post-launch cleanup item: superseded log groups with `retentionInDays = None` where safe (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
+1. Complete Phase 4 frontend productization (replace scaffold pages with live production UX).
+2. Execute deferred post-launch cleanup item: stale SNS pending placeholders for `dev.user@unityappeals.local` (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
+3. Execute deferred post-launch cleanup item: superseded log groups with `retentionInDays = None` where safe (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
 
 ## Suggested “First Command” In Next Session
 ```bash
@@ -255,7 +259,7 @@ cd /Users/benjaminfrank/Documents/unity-appeals-mvp
 git pull
 ```
 
-Then continue with: deferred post-launch hardening items from `docs/MASTER-PLAN.md` Phase 0.2.
+Then continue with: `docs/MASTER-PLAN.md` Phase 4 app-build planning + implementation.
 
 ## Next Chat Prompt
 ```text
@@ -281,8 +285,9 @@ Current state highlights:
 - CI migration smoke workflow is in place.
 
 Do this next (in order):
-1. Execute deferred post-launch cleanup for SNS pending placeholders in approved hardening window.
-2. Execute deferred post-launch cleanup for superseded log groups in approved hardening window.
+1. In Planning Mode, create the concrete Phase 4 execution plan for frontend productization.
+2. Implement `/app` and `/document/[id]` against live APIs with acceptance checks.
+3. Execute deferred post-launch cleanup for SNS pending placeholders and superseded log groups in approved hardening window.
 
 Constraints:
 - Preserve tenant isolation and PHI-disabled behavior.

@@ -89,6 +89,22 @@ Status: In progress
 Gate to Done:
 - [x] Product owner signs off on MVP acceptance criteria.
 
+## Phase 4 - App Build (post-MVP)
+Status: Not started
+
+### 4.1 Frontend productization
+- [ ] Replace scaffold pages (`/login`, `/app`, `/document/[id]`) with production UI tied to live APIs.
+- [ ] Implement real thread list/create UX and navigation to document workspace.
+- [ ] Implement document workspace UX (chat feed, generate/revise controls, export status/download).
+- [ ] Ensure tenant-safe auth UX and route behavior remain aligned with backend auth guards.
+
+### 4.2 Product iteration loop
+- [ ] Define first pilot backlog (top user-facing workflow improvements).
+- [ ] Add acceptance criteria and instrumentation for each shipped slice.
+
 ## Immediate Next 5 Tasks (strict order)
-1. Execute deferred stale SNS placeholder cleanup in post-launch hardening window (Phase 0.2).
-2. Execute deferred superseded log-group cleanup in post-launch hardening window (Phase 0.2).
+1. Run Planning Mode to produce a concrete Phase 4 implementation plan (scope, milestones, acceptance criteria).
+2. Implement first frontend slice: `/app` threads list/create wired to live APIs.
+3. Implement second frontend slice: `/document/[id]` live chat + generate/revise actions.
+4. Implement third frontend slice: export queue/status/download UX with error states.
+5. Execute deferred post-launch infra cleanup items from Phase 0.2 in the approved window.
