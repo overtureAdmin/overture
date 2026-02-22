@@ -30,7 +30,7 @@
         "dbHost": "unity-appeals-dev-db.cwdecey86htz.us-east-1.rds.amazonaws.com",
         "dbPort": 5432,
         "dbName": "unity_appeals",
-        "dbSecretArn": "arn:aws:secretsmanager:us-east-1:726792844549:secret:rds!db-e9e0506a-eee0-4916-bf9f-0c3f20cedf95-Cqtgri",
+        "dbSecretArn": "arn:aws:secretsmanager:us-east-1:726792844549:secret:unity-appeals-dev-app-db-credentials-SU2IxA",
         "dbSecretKmsKeyArn": "arn:aws:kms:us-east-1:726792844549:key/9dd888a6-a6d4-4f60-9215-90b98123f48c",
         "existingLogsVpcEndpointId": "vpce-0ce79d655ff2c3126",
         "existingSecretsManagerVpcEndpointId": "vpce-0a7aa949562b1cfc5",
