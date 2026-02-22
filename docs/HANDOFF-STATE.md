@@ -15,7 +15,7 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest pushed commit at handoff: `96e720c`
+- Latest pushed commit at handoff: `07f7670`
 - Handoff date: `2026-02-22` (UTC)
 
 ## What Is Implemented
@@ -119,13 +119,13 @@ Build an MVP prior-authorization appeal application that:
   - `web/scripts/run-migrations.mjs`
 
 ## Key Commits (Recent)
-- `867cea6` feat: implement aws hardening with staging-v2 isolated network stack
-- `ac52cc4` feat: add infra alarms and tighten VPC endpoint policies
-- `8a13e61` chore: restrict ECS KMS decrypt to Secrets Manager context
-- `8b388ac` feat: add staging stack deployment configuration
-- `f979a57` feat: move ECS runtime to least-privilege app DB credentials
-- `16aaa50` chore: add staging infra context and concrete dev endpoint config
-- `3c92773` refactor: load infra defaults from per-environment context
+- `07f7670` ops: add synthetic alarm smoke script for dev and staging
+- `109b42f` ops: add runtime smoke script for dev and staging
+- `b042cd8` ci: add web migration smoke workflow with disposable postgres
+- `18af46b` test: cover bedrock error and guardrail regression paths
+- `560be63` test: add chat and document generate API handler coverage
+- `a98739b` docs: add onboarding and handoff documentation set
+- `ba86b5f` feat: standardize db migrator flow and schedule export processing
 
 ## Latest Session Updates (`2026-02-22`)
 - Legacy non-canonical stack decommissioned:
@@ -207,8 +207,8 @@ Build an MVP prior-authorization appeal application that:
 
 ## Known Gaps / Next Priority Work
 1. Add API-level integration tests for chat/document route boundaries and auth failure paths.
-2. Add Bedrock regression tests for failure/guardrail paths.
-3. Add CI migration smoke against disposable DB.
+2. Finalize audit/compliance trail consistency checks for generate/revise/export metadata.
+3. Produce launch/go-live checklist and finalize Phase 3 handoff docs.
 4. Optional cleanup: stale SNS pending placeholders for `dev.user@unityappeals.local` after AWS auto-removal.
 5. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
 
@@ -238,12 +238,16 @@ Current state highlights:
 - Bedrock-only generation path implemented.
 - Export pipeline is implemented end-to-end (queue process + S3 artifact + status/download route).
 - PHI guardrails are enforced on generation inputs and model outputs (422 block path).
+- Standardized migrator credential model is implemented and validated in dev + staging-v2.
+- Periodic export queue processing trigger is deployed.
+- Runtime smoke and alarm smoke scripts are in place.
+- CI migration smoke workflow is in place.
 
 Do this next (in order):
-1. Phase 0.1: implement standardized migrator credential model for dev and staging (no ad hoc master-secret use).
-2. Update runbook/docs for the migration procedure and validate both environments.
-3. Phase 2: add automated tests for export processing and status/download routes.
-4. Add a periodic trigger path for export queue processing.
+1. Complete remaining Phase 2 API integration tests for chat/document auth + tenant boundary coverage.
+2. Verify and tighten Phase 1.3 audit metadata consistency for generate/revise/export paths.
+3. Update launch-readiness docs (go-live checklist + handoff alignment) and close Phase 3.1 items.
+4. Run full validation (build/tests/CI-smoke/runtime-smoke/alarm-smoke) and update docs with results.
 
 Constraints:
 - Preserve tenant isolation and PHI-disabled behavior.

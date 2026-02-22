@@ -63,8 +63,8 @@ Status: In progress
 ### 2.1 Automated test coverage
 - [x] Automated tests for export queue processing and export status/download payload behavior.
 - [ ] API integration tests for chat and document endpoints (tenant boundaries + auth required paths).
-- [ ] Regression tests for Bedrock path error handling.
-- [ ] Migration smoke test in CI against disposable DB.
+- [x] Regression tests for Bedrock path error handling.
+- [x] Migration smoke test in CI against disposable DB.
 
 ### 2.2 Runtime checks
 - [x] Health/smoke script for dev and staging covering auth + thread + document flow.
@@ -89,8 +89,8 @@ Gate to Done:
 - [ ] Product owner signs off on MVP acceptance criteria.
 
 ## Immediate Next 5 Tasks (strict order)
-1. Define and implement dedicated migrator credential flow (Phase 0.1). ✅ completed
-2. Update runbook with the new migration flow and validate in dev + staging. ✅ completed
-3. Add Bedrock output guardrails/non-PHI validation (Phase 1.1).
-4. Add automated tests for export queue processing and download-status routes (Phase 2.1). ✅ completed
-5. Add periodic/scheduled trigger for `api/exports/process` worker path. ✅ completed
+1. Add API integration tests for chat/document auth and tenant boundary behavior (Phase 2.1).
+2. Validate/complete audit metadata consistency across generate/revise/export (Phase 1.3).
+3. Keep `docs/HANDOFF-STATE.md` aligned with every material runtime/test/deploy change (Phase 3.1).
+4. Produce go-live checklist (deploy, migrate, smoke, rollback) in docs (Phase 3.1).
+5. Decide and document defer/execute status for optional SNS placeholder + legacy log-group cleanup (Phase 0.2).
