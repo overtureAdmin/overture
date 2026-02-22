@@ -45,8 +45,14 @@ function getBearerToken(request: Request): string | null {
 }
 
 async function verifyCognitoToken(token: string): Promise<CognitoClaims | null> {
-  const appClientId = requireEnv("COGNITO_APP_CLIENT_ID");
-  const issuer = getIssuer();
+  let appClientId: string;
+  let issuer: string;
+  try {
+    appClientId = requireEnv("COGNITO_APP_CLIENT_ID");
+    issuer = getIssuer();
+  } catch {
+    return null;
+  }
 
   try {
     const { payload } = await jwtVerify(token, getJwks(), {
