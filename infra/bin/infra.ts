@@ -11,6 +11,7 @@ const deployEnvironment =
   (app.node.tryGetContext('environment') as string | undefined) ??
   process.env.DEPLOY_ENV ??
   'dev';
+const stackId = deployEnvironment === 'dev' ? 'InfraStack' : `InfraStack-${deployEnvironment}`;
 const context = app.node.tryGetContext('environments') as AppContext['environments'];
 const config = context?.[deployEnvironment];
 
@@ -20,7 +21,7 @@ if (!config) {
   );
 }
 
-new InfraStack(app, 'InfraStack', {
+new InfraStack(app, stackId, {
   env: {
     account: config.account,
     region: config.region,
