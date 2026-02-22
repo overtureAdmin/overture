@@ -136,6 +136,30 @@ curl -i -X GET \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+## Runtime Smoke Script
+
+Run full API smoke coverage for auth, thread creation, document generate, export queue/process/status in dev + staging:
+
+```bash
+cd infra
+./scripts/runtime-smoke.sh both
+```
+
+Single environment:
+
+```bash
+cd infra
+./scripts/runtime-smoke.sh dev
+./scripts/runtime-smoke.sh staging
+```
+
+Equivalent npm script:
+
+```bash
+cd infra
+npm run smoke:runtime
+```
+
 ## Alarm Test Procedure
 
 Trigger ALARM state manually:

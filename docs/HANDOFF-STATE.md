@@ -184,6 +184,15 @@ Build an MVP prior-authorization appeal application that:
    - `web/src/lib/export-processing.test.ts`
    - `web/src/lib/export-status.test.ts`
    - `npm run test` now runs `node --test "src/**/*.test.ts"` in `web`.
+ - Runtime smoke automation (Phase 2.2 slice):
+   - Added script `infra/scripts/runtime-smoke.sh` and npm wrapper `npm run smoke:runtime`.
+   - Script validates in dev/staging:
+     - auth (`GET /api/threads`)
+     - thread create
+     - document generate
+     - export queue + status completion
+     - internal export processor unauthorized (`401`) and authorized (`200`) checks.
+   - Latest run passed in both environments.
  - Alarm-noise hardening:
    - Updated ECS running-task alarm missing-data behavior from `BREACHING` to `NOT_BREACHING` in both stacks.
    - Verified both alarms are currently `OK`:

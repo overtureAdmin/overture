@@ -67,7 +67,7 @@ Status: In progress
 - [ ] Migration smoke test in CI against disposable DB.
 
 ### 2.2 Runtime checks
-- [ ] Health/smoke script for dev and staging covering auth + thread + document flow.
+- [x] Health/smoke script for dev and staging covering auth + thread + document flow.
 - [ ] Alarm validation script for periodic ALARM/OK synthetic checks.
 
 Gate to Phase 3:
