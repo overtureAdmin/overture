@@ -12,88 +12,125 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest pushed commit at handoff: `a43e539`
+- Latest pushed commit at handoff: `867cea6`
+- Handoff date: `2026-02-22` (UTC)
 
 ## What Is Implemented
 
 ### Infra (CDK)
-- ECS Fargate service behind ALB deployed and healthy.
-- Interface endpoint SG remediation is in place (app SG -> endpoint SG on 443).
-- ALB health check set for redirect-compatible app behavior (`/`, `200-399`).
-- Cognito user pool + app client now managed in CDK.
-- ECS task definition now gets:
-  - Cognito env vars
-  - DB host/port/name env vars
-  - DB username/password from Secrets Manager
-  - `DEV_BYPASS_AUTH=false`
-- ECS execution role has Secrets Manager read + KMS decrypt for DB secret path.
+- Environment-specific config model is in place (no hardcoded fallback IDs/ARNs in stack logic).
+- Dev stack (`InfraStack`) is deployed and healthy.
+- New dedicated staging network/app path is deployed:
+  - `NetworkStack-staging` (dedicated VPC + subnets + NAT + endpoints + staging RDS)
+  - `InfraStack-staging-v2` (staging app stack consuming network stack outputs)
+- Cognito user pools/clients managed in CDK for both dev and staging-v2.
+- ECS execution role hardening:
+  - `kms:Decrypt` constrained by `kms:ViaService` and `kms:EncryptionContext:SecretARN`.
+- Alarming and notification wiring:
+  - ALB target 5xx
+  - ECS running task count low
+  - RDS CPU high
+  - RDS free storage low
+  - RDS connections high
+  - SNS topic + email subscription + Alarm/OK actions
+- ECS deployment safety:
+  - circuit breaker rollback enabled
+  - explicit `minHealthyPercent=100`, `maxHealthyPercent=200`
+- Log retention config applied:
+  - dev: 30 days
+  - staging-v2: 90 days
+- Endpoint policy hardening tooling:
+  - `infra/scripts/apply-vpc-endpoint-policies.sh` supports `apply` and `check`
+  - npm scripts: `apply:endpoint-policies`, `check:endpoint-policies`
+
+### Data / DB Security
+- Dev master secret rotated successfully.
+- Dev app now uses least-privilege DB credentials secret at runtime.
+- RDS baseline controls set:
+  - dev: retention 7 days, backup window `03:00-04:00`, maintenance `sun:04:00-sun:05:00`, PI enabled
+  - staging-v2: retention 14 days, backup window `04:00-05:00`, maintenance `sun:05:00-sun:06:00`, PI enabled
 
 ### Web App / APIs
 - Required frontend routes scaffolded:
   - `/login`, `/app`, `/document/[id]`
 - Required API endpoints scaffolded.
-- Real DB-backed implementations (tenant-scoped) for:
+- Real DB-backed implementations (tenant-scoped):
   - `GET /api/threads`
   - `POST /api/threads`
   - `POST /api/chat/:threadId/message`
 - Auth parser upgraded to Cognito JWT verification (JWKS, issuer, client checks).
 - Route protection in `web/src/proxy.ts` for `/app` and `/document/*`.
-- DB schema + migration runner implemented:
-  - `web/db/migrations/0001_init.sql`
-  - `web/scripts/run-migrations.mjs`
+- DB migration runner is in place and used for env bring-up.
 
-## Deployed Runtime State (dev)
-- Region: `us-east-1`
+## Deployed Runtime State
+
+### Dev (active)
 - Stack: `InfraStack`
-- ALB URL:
-  - `http://InfraS-Unity-C35fhtjknemR-1912925693.us-east-1.elb.amazonaws.com`
-- ECS task definition in service (at handoff): `InfraStackWebTaskDef75DBC5BE:6`
-- CDK-managed Cognito outputs:
-  - `ConfiguredCognitoRegion = us-east-1`
+- ALB URL: `http://InfraS-Unity-C35fhtjknemR-1912925693.us-east-1.elb.amazonaws.com`
+- Cognito:
   - `ConfiguredCognitoUserPoolId = us-east-1_zl8zG5Dpl`
   - `ConfiguredCognitoAppClientId = 7a3qa4prrq1h9v71snfhqo36f4`
 
-## Validation Already Performed
-- ECS service reached steady state after latest rollouts.
-- Authenticated ALB API smoke test succeeded against CDK-managed Cognito client:
-  - `POST /api/threads` success
-  - `GET /api/threads` success
-- RDS migrations executed successfully from ECS one-off task:
-  - `apply 0001_init.sql`
-  - `migrations complete`
+### Staging-v2 (active, isolated)
+- Network stack: `NetworkStack-staging`
+- App stack: `InfraStack-staging-v2`
+- ALB URL: `http://InfraS-Unity-iGMyoO90DG4I-1920092028.us-east-1.elb.amazonaws.com`
+- Cognito:
+  - `ConfiguredCognitoUserPoolId = us-east-1_lJ4XChD2H`
+  - `ConfiguredCognitoAppClientId = 5395vq9loa484ipjcgtr3o5lh2`
+
+### Legacy Staging Stack (not canonical)
+- Stack: `InfraStack-staging`
+- Status: `UPDATE_ROLLBACK_COMPLETE`
+- Reason: failed in-place LB/VPC migration attempt during cutover; replaced by blue/green `InfraStack-staging-v2`.
+
+## Validation Performed (Latest Session)
+- `infra` build + tests passed.
+- Deployed `InfraStack` successfully.
+- Deployed `NetworkStack-staging` + `InfraStack-staging-v2` successfully.
+- Ran staging-v2 DB migrations via one-off ECS task (exit code `0`).
+- Seeded staging-v2 Cognito test user successfully.
+- Authenticated ALB API smoke tests passed:
+  - dev `GET /api/threads` => `200 OK`
+  - staging-v2 `GET /api/threads` => `200 OK`
+- ECS services verified steady state with rollout `COMPLETED` in both envs.
+- Endpoint policy `apply` and `check` both pass.
+- Synthetic alarm state transitions (`ALARM` then `OK`) executed successfully for dev and staging-v2 alarm names.
 
 ## Important Files
 - Infra:
   - `infra/lib/infra-stack.ts`
+  - `infra/lib/network-stack.ts`
   - `infra/bin/infra.ts`
+  - `infra/cdk.json`
+  - `infra/scripts/apply-vpc-endpoint-policies.sh`
   - `infra/scripts/seed-dev-cognito-user.sh`
-  - `infra/README.md`
+- Runbook:
+  - `docs/INFRA-OPERATIONS.md`
 - Web:
   - `web/src/lib/auth.ts`
   - `web/src/lib/db.ts`
-  - `web/src/lib/tenant-context.ts`
   - `web/src/proxy.ts`
   - `web/src/app/api/threads/route.ts`
   - `web/src/app/api/chat/[threadId]/message/route.ts`
-  - `web/db/migrations/0001_init.sql`
   - `web/scripts/run-migrations.mjs`
-  - `web/Dockerfile`
 
-## Key Commits (recent)
-- `a43e539` feat: manage Cognito pool/client in CDK and add dev user seed script
-- `eb5c215` chore: codify Cognito and DB task config in CDK
-- `afa3b9f` fix: return unauthorized when Cognito env is missing
-- `dbc79b9` feat: add Cognito JWT verification and run migrations via ECS
-- `2c9d594` feat: add tenant-scoped postgres APIs and auth proxy
-- `45fd86e` feat: add ECS endpoint remediation and MVP route/API scaffolding
+## Key Commits (Recent)
+- `867cea6` feat: implement aws hardening with staging-v2 isolated network stack
+- `ac52cc4` feat: add infra alarms and tighten VPC endpoint policies
+- `8a13e61` chore: restrict ECS KMS decrypt to Secrets Manager context
+- `8b388ac` feat: add staging stack deployment configuration
+- `f979a57` feat: move ECS runtime to least-privilege app DB credentials
+- `16aaa50` chore: add staging infra context and concrete dev endpoint config
+- `3c92773` refactor: load infra defaults from per-environment context
 
 ## Known Gaps / Next Priority Work
-1. Replace hardcoded fallback IDs/arns/defaults in `infra/lib/infra-stack.ts` with environment-specific config (SSM params or per-env context) and remove sensitive defaults.
-2. Rotate RDS secret/password used during setup and verify ECS still starts with updated secret.
-3. Create least-privilege app DB user and update ECS secret source accordingly.
-4. Add staging environment stack config and deploy isolated staging resources.
-5. Implement Bedrock-backed response path in `POST /api/chat/:threadId/message`.
-6. Complete remaining document pipeline endpoints (`generate/revise/export`) with DB persistence + audit events.
+1. Promote staging-v2 as canonical and decommission legacy `InfraStack-staging` safely.
+2. Confirm SNS email subscription delivery in inbox (external/manual confirmation evidence still needed).
+3. Optional cleanup: old log groups from superseded stacks with `retentionInDays = None`.
+4. Begin app delivery:
+   - Implement Bedrock-backed path in `POST /api/chat/:threadId/message`.
+   - Implement document pipeline endpoints (`generate/revise/export`) with persistence + audit events.
 
 ## Suggested “First Command” In Next Session
 ```bash
@@ -101,4 +138,4 @@ cd /Users/benjaminfrank/Documents/unity-appeals-mvp
 git pull
 ```
 
-Then continue with priority item #1 above.
+Then continue with: decommission legacy `InfraStack-staging`, confirm SNS delivery evidence, and start Bedrock app path implementation.
