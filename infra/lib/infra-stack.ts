@@ -6,6 +6,7 @@ import * as ecsPatterns from 'aws-cdk-lib/aws-ecs-patterns';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 
 export class InfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -60,10 +61,39 @@ export class InfraStack extends cdk.Stack {
       clusterName: 'unity-appeals-dev-cluster',
     });
 
-    const cognitoRegion = this.node.tryGetContext('cognitoRegion') ?? 'us-east-1';
-    const cognitoUserPoolId = this.node.tryGetContext('cognitoUserPoolId') ?? 'us-east-1_70AMzJCnx';
-    const cognitoAppClientId =
-      this.node.tryGetContext('cognitoAppClientId') ?? '2nntv51ltehca3jvr2cvhskjhl';
+    const userPool = new cognito.UserPool(this, 'UnityAppealsUserPool', {
+      userPoolName: 'unity-appeals-dev-users-cdk',
+      selfSignUpEnabled: false,
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      customAttributes: {
+        tenant_id: new cognito.StringAttribute({ minLen: 1, maxLen: 64, mutable: true }),
+      },
+      passwordPolicy: {
+        minLength: 12,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const userPoolClient = userPool.addClient('UnityAppealsWebClient', {
+      userPoolClientName: 'unity-appeals-dev-web-cdk',
+      generateSecret: false,
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
+        adminUserPassword: true,
+      },
+      preventUserExistenceErrors: true,
+    });
+
+    const cognitoRegion = cdk.Stack.of(this).region;
+    const cognitoUserPoolId = userPool.userPoolId;
+    const cognitoAppClientId = userPoolClient.userPoolClientId;
     const dbHost =
       this.node.tryGetContext('dbHost') ?? 'unity-appeals-dev-db.cwdecey86htz.us-east-1.rds.amazonaws.com';
     const dbPort = String(this.node.tryGetContext('dbPort') ?? 5432);
@@ -185,6 +215,10 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'ConfiguredCognitoAppClientId', {
       value: cognitoAppClientId,
+    });
+
+    new cdk.CfnOutput(this, 'ConfiguredCognitoRegion', {
+      value: cognitoRegion,
     });
 
     new cdk.CfnOutput(this, 'WebLoadBalancerDnsName', {
