@@ -1,0 +1,85 @@
+name: migration-smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  web-migration-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: unity_appeals
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d unity_appeals"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations (first pass)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:54329/unity_appeals
+          DATABASE_SSL: disable
+        run: npm run migrate
+
+      - name: Run migrations (idempotency pass)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:54329/unity_appeals
+          DATABASE_SSL: disable
+        run: npm run migrate
+
+      - name: Verify schema_migrations entries
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:54329/unity_appeals
+          DATABASE_SSL: disable
+        run: |
+          node -e "
+          const { readdirSync } = require('node:fs');
+          const { Client } = require('pg');
+          (async () => {
+            const files = readdirSync('./db/migrations').filter(f => f.endsWith('.sql')).sort();
+            const c = new Client({ connectionString: process.env.DATABASE_URL });
+            await c.connect();
+            const res = await c.query('SELECT version FROM schema_migrations ORDER BY version');
+            await c.end();
+            const applied = res.rows.map(r => r.version);
+            if (applied.length !== files.length) {
+              throw new Error(\`Expected \${files.length} migrations, found \${applied.length}\`);
+            }
+            for (let i = 0; i < files.length; i += 1) {
+              if (files[i] !== applied[i]) {
+                throw new Error(\`Mismatch at index \${i}: expected \${files[i]} got \${applied[i]}\`);
+              }
+            }
+            console.log('migration smoke passed');
+          })().catch((err) => {
+            console.error(err);
+            process.exit(1);
+          });
+          "
