@@ -1,4 +1,4 @@
-# Unity Appeals MVP - Handoff State
+# Overture - Handoff State
 
 ## Canonical Execution Plan
 - Use `docs/MASTER-PLAN.md` as the single ordered source of truth for remaining work and phase gates.
@@ -15,8 +15,8 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest pushed commit at handoff: `b8a068f`
-- Handoff date: `2026-02-22` (UTC)
+- Latest pushed commit at handoff: `adf36df`
+- Handoff date: `2026-02-24` (UTC)
 
 ## What Is Implemented
 
@@ -100,6 +100,312 @@ Build an MVP prior-authorization appeal application that:
 - `cd infra && npm run smoke:runtime` passed (`dev` + `staging`).
 - `cd infra && npm run smoke:alarms` passed (`InfraStack-alb-target-5xx`, `InfraStack-staging-v2-alb-target-5xx`).
 
+## Latest Session Updates (`2026-03-08`) - Overture Brand Rollout
+- Login/app readability hotfix + rollout completed (`2026-03-08`):
+  - Root cause: `web/src/app/globals.css` had regressed to a minimal fallback stylesheet, which removed shared `calm-*` component classes and re-enabled dark auto-theme behavior.
+  - Fix:
+    - Rebuilt full design-token stylesheet with light Overture palette and restored shared classes:
+      - `calm-card`
+      - `calm-card-soft`
+      - `calm-input`
+      - `calm-primary`
+      - `calm-ghost`
+      - `calm-cta`
+      - `calm-badge`
+    - File: `web/src/app/globals.css`
+  - Validation evidence:
+    - `cd web && npm run test` passed (`59/59`).
+    - Docker production build passed during image build (`next build` completed successfully in container).
+  - Deploy + rollout evidence:
+    - ECR image pushed:
+      - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+      - digest: `sha256:faef59a65a9a11ad1730f505f460981caae6b931afafc1973c6f9e96efaeaccd`
+    - ECS rollout forced on staging service:
+      - `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+      - deployment: `ecs-svc/3893960429211012584`
+      - status: `PRIMARY rolloutState=COMPLETED`
+    - Endpoint check:
+      - `curl -sSI https://app.oncologyexecutive.com/login` returned `HTTP/2 200`.
+
+- Brand asset source switched to user-provided official Overture files:
+  - `web/public/overture-logo.png` (wordmark)
+  - `web/public/overture-mark.png` (favicon/mark)
+- Runtime icon/logo wiring updated:
+  - `web/src/app/layout.tsx` now uses PNG icon metadata (`icon`, `shortcut`, `apple`) pointing to `overture-mark.png`.
+  - `web/src/app/login/page.tsx` now renders `overture-logo.png`.
+- App theme updated from teal/green-blue to purple-first palette:
+  - `web/src/app/globals.css` design tokens and core component styles updated.
+  - High-use UI surfaces updated to harmonize with purple branding:
+    - app shell
+    - document workspace
+    - settings/super-admin panels
+- Documentation branding sweep completed:
+  - Titles and user-facing references now use Overture naming.
+  - Historical AWS resource IDs retain legacy `unity-*` identifiers for operational continuity.
+- Validation evidence:
+  - `cd web && npm run test` passed (`59` tests, `0` failed).
+  - `cd web && npm run build` passed.
+
+## Latest Session Updates (`2026-03-08`) - Workspace Recovery + Staging Rollout
+- Root-cause findings after interrupted VS Code/Codex process:
+  - multiple key source files had restrictive mode `600`, causing module resolution and build instability in Next/Turbopack.
+  - stale/backup dependency tree under `web/node_modules_corrupt_*` was being picked up by TS include patterns during build.
+  - stale Next build locks/processes intermittently blocked `next build`.
+- Recovery actions:
+  - normalized `web/src/**` file permissions to readable defaults.
+  - moved `web/node_modules_corrupt_1772983440` out of app path.
+  - repaired missing compatibility exports and parser contracts in:
+    - `web/src/lib/auth.ts`
+    - `web/src/lib/workflow-checklist.ts`
+    - `web/src/lib/document-placeholders.ts`
+    - `web/src/lib/prompt-sanitization.ts`
+    - `web/src/lib/tenant-context.ts`
+    - `web/src/lib/workflow-policy.ts`
+    - `web/src/lib/workflow-orchestration.ts`
+  - removed legacy default favicon (`web/src/app/favicon.ico`) and switched runtime app icon to official Overture mark via `web/src/app/icon.png`.
+- Branding/runtime evidence:
+  - `web/public/overture-logo.png` and `web/public/overture-mark.png` refreshed from user-provided files in Downloads.
+  - `web/src/app/layout.tsx` metadata title/icons updated to Overture.
+- Validation evidence:
+  - `cd web && npm run test` -> pass (`59/59`).
+  - `cd web && npm run build -- --webpack` -> pass.
+  - Docker image build -> pass (web context build).
+  - ECR push -> pass:
+    - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+    - digest: `sha256:6f071deb90dc3365564103219998dffa5a686caac2c43db2581644eea20de043`
+  - ECS rollout triggered:
+    - cluster: `unity-appeals-staging-v2-cluster`
+    - service: `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+    - primary deployment observed `COMPLETED`.
+
+## Latest Session Updates (`2026-03-05`)
+- n8n OSS orchestration foundation implemented in repo (not yet deployed to staging in this session):
+  - Infra:
+    - `infra/lib/infra-stack.ts`
+      - Adds optional n8n ECS Fargate service (enabled by context flag), credentials/encryption secrets, and web runtime env wiring:
+        - `N8N_WEBHOOK_URL`
+        - `N8N_CALLBACK_SHARED_SECRET`
+        - `N8N_WEBHOOK_TIMEOUT_MS`
+      - Adds stack outputs:
+        - `N8nUrl`
+        - `N8nCredentialsSecretArn`
+    - `infra/cdk.json`
+      - `dev`: `enableN8n=false`
+      - `staging`: `enableN8n=true`
+  - Data model:
+    - `web/db/migrations/0015_workflow_batches_n8n.sql`
+      - adds `llm_org_prompt`
+      - adds `admin_workflow_orchestration`
+      - adds `workflow_batch`
+      - adds `workflow_batch_audit`
+      - grants `unity_app` access for all new tables
+  - Backend APIs:
+    - `GET/PATCH /api/admin/workflow/orchestration`
+    - `GET/POST /api/admin/workflow/batches`
+    - `POST /api/internal/workflow/batches/callback` (shared-token protected)
+  - Prompt composition:
+    - `web/src/lib/llm-settings.ts` now resolves prompt stack as:
+      - base + master + organization + user + references
+  - Super-admin UX:
+    - `web/src/app/app/super-admin/page.tsx`
+      - Workflow tab now includes:
+        - n8n orchestration policy editor
+        - dispatch preview-thread batch action
+        - recent batch table
+- Validation evidence (local):
+  - `cd web && npm run test` passed.
+  - `cd infra && npm run check:endpoint-policies` passed.
+  - Build verification caveat:
+    - `next build` intermittently hit local Turbopack lock/panic issues (`.next` lock/symlink collisions) in this execution environment.
+    - No staging deploy was performed for this n8n slice in this session.
+
+## Latest Session Updates (`2026-03-01`)
+- LLM functionality expansion deployed to staging (prompt governance + reference context + document-update chat UX):
+  - Database migration applied:
+    - `web/db/migrations/0009_llm_prompt_and_references.sql`
+    - Adds:
+      - `llm_master_prompt` (super-admin managed global default prompt)
+      - `llm_user_prompt` (per-user override prompt)
+      - `llm_user_reference` (per-user references with usage notes)
+  - Backend prompt composition and Bedrock integration:
+    - Added `web/src/lib/llm-settings.ts` to resolve effective prompt as:
+      - base safety/system prompt + master prompt + user prompt + formatted references context
+    - Integrated into Bedrock-only handlers:
+      - `POST /api/chat/:threadId/message`
+      - `POST /api/documents/:id/generate`
+      - `POST /api/documents/:id/revise`
+  - New APIs:
+    - User settings:
+      - `GET/PATCH /api/profile/llm-settings`
+      - Supports user prompt editing and reference list management (link/document + usage note).
+    - Super-admin:
+      - `GET/PATCH /api/admin/llm/master-prompt`
+      - Supports editing default master prompt applied to users without override.
+  - UI surfaces delivered:
+    - `/app/profile`:
+      - new `LLM Settings` section with editable user prompt, effective prompt visibility, and reference CRUD.
+    - `/app/super-admin`:
+      - new `Master System Prompt` editor (super-admin only).
+    - `/document/[id]` case chat:
+      - generate/revise now post assistant summary plus a document update link card tokenized as:
+        - `[[DOCUMENT_UPDATE|docId|label|mode|/document/{threadId}?doc={docId}]]`
+      - workspace renders this as a clickable update card and hydrates selected version by `?doc=...`.
+  - Validation evidence:
+    - `cd web && npm run test` passed.
+    - `cd web && npm run build` passed.
+  - Deploy + rollout evidence:
+    - Staging migration task completed successfully:
+      - task ARN: `arn:aws:ecs:us-east-1:726792844549:task/unity-appeals-staging-v2-cluster/ddb5d0283a794b969e60a3136c7aeb96`
+      - result: `STOPPED`, `exitCode=0`.
+    - Web image pushed:
+      - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+      - digest: `sha256:c5162f2545d8ef49961914f76d1ef28220364f9c4d33d8769517f6c08016e530`
+    - ECS rollout completed:
+      - service: `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+      - deployment id: `ecs-svc/9124437966272581932`
+      - state: `PRIMARY`, `rolloutState=COMPLETED`
+      - task definition: `InfraStackstagingv2WebTaskDef0200C998:9`
+- MFA management backend authorization fix deployed to staging:
+  - Root cause: ECS web task role in `InfraStack-staging-v2` did not allow Cognito admin MFA actions, causing profile MFA disable failures.
+  - Infra change:
+    - `infra/lib/infra-stack.ts` adds task-role permissions for:
+      - `cognito-idp:AdminGetUser`
+      - `cognito-idp:AdminSetUserMFAPreference`
+      - `cognito-idp:AssociateSoftwareToken`
+      - `cognito-idp:VerifySoftwareToken`
+      - `cognito-idp:SetUserMFAPreference`
+  - Deploy evidence:
+    - `npx cdk deploy InfraStack-staging-v2 -c environment=staging --require-approval never` completed.
+    - CloudFormation updated `WebTaskDef/TaskRole/DefaultPolicy`.
+  - Validation evidence:
+    - `cd infra && npm run build` passed.
+    - `cd infra && npm run test` passed.
+    - `cd infra && npm run check:endpoint-policies` passed.
+    - `cd infra && npm run smoke:runtime` result: dev passed, staging failed at auth-token acquisition (script needs update for current auth/MFA requirements; app service remained healthy during deploy).
+- MFA replace-device reliability hardening deployed to staging:
+  - Cognito OAuth scope alignment:
+    - `infra/lib/infra-stack.ts` user-pool client now includes `cognito.OAuthScope.COGNITO_ADMIN`.
+    - `web/src/app/auth/login/route.ts` now requests `aws.cognito.signin.user.admin` in Hosted UI scope.
+  - API behavior hardening:
+    - `web/src/app/api/profile/security/mfa/disable/route.ts` now verifies post-disable state via `AdminGetUser` and returns conflict if software-token MFA remains required.
+  - Deploy evidence:
+    - Infra deploy updated Cognito app client (`AWS::Cognito::UserPoolClient` update complete).
+    - Web image pushed: `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+      - digest: `sha256:29e43d31b6274efb2aef83470c70febbb2c4c4d1d3a831eb97eacd4dde83bf98`
+    - ECS rollout completed:
+      - deployment id: `ecs-svc/6428806946526798078`
+      - event: `deployment completed`, service steady state reached.
+  - Validation evidence:
+    - `cd infra && npm run build && npm run test && npm run check:endpoint-policies` passed.
+    - `cd web && npm run test` passed.
+    - `cd web && npm run build` passed.
+- MFA profile UX update deployed to staging (QR-first setup):
+  - UI changes (`/app/profile`):
+    - Removed visible `Disable MFA devices` action.
+    - Renamed setup action to `Reset MFA`.
+    - Added QR rendering for authenticator enrollment with manual secret fallback.
+  - API changes:
+    - `POST /api/profile/security/mfa/setup/start` now returns `otpauthUri` alongside `secretCode`/`session`.
+  - Dependency additions:
+    - `web/package.json`: `qrcode`
+    - `web/package.json`: `@types/qrcode` (dev)
+  - Deploy evidence:
+    - Web image pushed:
+      - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+      - digest: `sha256:ea8a5b2aae936f522fa365625715dc9f9bd4a05e8348d788d79ca16e912bdc6e`
+    - ECS rollout completed:
+      - deployment id: `ecs-svc/8790235364059998740`
+      - event: service reached steady state.
+- Super-admin + profile settings UX updates:
+  - Restored `SuperAdminBanner` visibility on `/app/profile` (banner now appears consistently for super-admin users across settings pages).
+  - Settings page shell remains viewport-locked with container-level scrolling.
+- Super-admin destructive controls added:
+  - Added `Delete org` action in `/app/super-admin` organization table.
+  - Added `Delete user` action in `/app/super-admin` organization user table.
+  - Delete-org flow removes organization data and tenant-scoped app data; performs post-delete orphan `user_identity` cleanup.
+  - Delete-user flow detaches user-owned tenant references, removes org membership/app-user row for that org, and preserves identity continuity where applicable.
+- Super-admin action logging:
+  - Added dedicated `super_admin_action_log` table migration:
+    - `web/db/migrations/0008_super_admin_action_log.sql`
+  - Added history API + UI surface:
+    - `GET /api/admin/actions/history`
+    - New `Admin Action Log` section under Super Admin `History` tab.
+- New admin APIs:
+  - `POST /api/admin/organizations/delete`
+  - `POST /api/admin/users/delete`
+- Validation + rollout:
+  - `cd web && npm run test` passed.
+  - `cd web && npm run build` passed.
+  - Staging migration task executed and completed with `exitCode: 0`.
+
+## Latest Session Updates (`2026-03-02`)
+- Case workspace interaction model updated so chat is now the primary draft-control surface:
+  - Removed separate `Smart Update Draft` action path from Details tab.
+  - Chat submit now drives document operations directly:
+    - No selected document: chat request creates first draft.
+    - Selected document: chat request revises current draft.
+  - Details tab is now focused on intake/form-fill + checklist + export and no longer acts as the primary drafting trigger.
+  - Checklist block behavior remains enforced with explicit missing-required feedback and owner/admin force-generate control.
+- Files touched:
+  - `web/src/app/document/[id]/workspace.tsx`
+- Validation evidence:
+  - `cd web && npm run test` passed.
+  - `cd web && npm run build` passed.
+- Deploy + rollout evidence:
+  - Web image pushed:
+    - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+    - digest: `sha256:eebe9c953fb1173cb4c6147766dd53a36455a434ad8f5dead439e88b67421cfa`
+  - ECS rollout completed:
+    - service: `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+
+## Latest Session Updates (`2026-03-04`)
+- Checklist extraction reliability improved for free-text/narrative intake:
+  - Implemented shared required-field extraction in `web/src/lib/workflow-checklist.ts` with broader patterns for:
+    - narrative denials (`denied X by Y due to Z`)
+    - flexible DOB formats (`YYYY-MM-DD`, `MM/DD/YYYY`)
+    - payer/member/sex synonyms
+  - Updated structured-context detection to permit checklist evaluation when enough required signals are present even without strict `Context for this case:` header.
+  - Wired workspace intake inference to reuse this same parser:
+    - `web/src/lib/workspace-intelligence.ts`
+- PHI placeholder pipeline implemented for Bedrock generation/revision:
+  - Added `web/src/lib/document-placeholders.ts`:
+    - canonical placeholder spec
+    - model-output normalization to canonical placeholders
+    - app-side hydration using tenant-scoped case context fields
+  - Updated Bedrock handlers to enforce placeholder instruction block and hydrate draft content app-side before persistence/display:
+    - `web/src/lib/api-handlers/document-generate.ts`
+    - `web/src/lib/api-handlers/document-revise.ts`
+  - Outcome:
+    - LLM input remains de-identified.
+    - LLM is guided to emit placeholders.
+    - Final visible draft is hydrated app-side with case PHI values.
+- Validation evidence:
+  - `cd web && npm run test` passed (includes new:
+    - `web/src/lib/workflow-checklist.test.ts`
+    - `web/src/lib/document-placeholders.test.ts`)
+  - `cd web && npm run build` passed.
+- Dependency repair completed:
+  - Installed missing package `@smithy/protocol-http` in `web/` to repair AWS SDK transitive resolution under Turbopack.
+- Staging deploy + rollout evidence:
+  - Web image pushed:
+    - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+    - digest: `sha256:cd29ac1622d426fb334d96cc135cb9e31ebe1c16a515727a99102ca6f7882285`
+  - ECS force deployment triggered:
+    - cluster: `unity-appeals-staging-v2-cluster`
+    - service: `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+    - deployment id: `ecs-svc/2332649616943315789`
+  - Rollout state:
+    - `PRIMARY`, `COMPLETED`, desired/running/pending = `1/1/0`
+  - Runtime check:
+    - `curl -sSI https://app.oncologyexecutive.com/login` returned `HTTP/2 200`.
+    - deployment id: `ecs-svc/1988115557649984962`
+    - state: `PRIMARY`, `rolloutState=COMPLETED`
+  - Running task digest verification:
+    - task: `arn:aws:ecs:us-east-1:726792844549:task/unity-appeals-staging-v2-cluster/514536ad550f4c8e90492ca55d97b0bd`
+    - container image digest: `sha256:eebe9c953fb1173cb4c6147766dd53a36455a434ad8f5dead439e88b67421cfa`
+  - Staging ECS rollout started for web image digest:
+    - `sha256:8b59c06755843bfb56726ba24c1bf03633a6dfbc2a6ec9f7ed34030ddd7a49d2`
+
 ## Important Files
 - Infra:
   - `infra/lib/infra-stack.ts`
@@ -127,7 +433,287 @@ Build an MVP prior-authorization appeal application that:
 - `a98739b` docs: add onboarding and handoff documentation set
 - `ba86b5f` feat: standardize db migrator flow and schedule export processing
 
-## Latest Session Updates (`2026-02-22`)
+## Latest Session Updates (`2026-02-23`)
+- Cognito Hosted UI custom branding pushed live (dev + staging):
+  - Source brand asset:
+    - Downloaded then-current legacy logo from `https://unityhealthtech.com/wp-content/uploads/2023/12/Color-logo-no-background.png`.
+    - Stored in repo as `infra/assets/unity-cognito-logo.png`.
+  - Infra implementation:
+    - `infra/lib/infra-stack.ts`:
+      - `managedLoginVersion` remains `NEWER_MANAGED_LOGIN`.
+      - `CfnManagedLoginBranding` switched from Cognito defaults to custom settings + custom `FORM_LOGO` asset.
+      - Applied then-current legacy color palette for page background, text, inputs, links, and primary/secondary buttons.
+  - Deployments:
+    - `npx cdk deploy InfraStack-staging-v2 -c environment=staging --require-approval never` passed.
+    - `npx cdk deploy InfraStack --require-approval never` passed.
+  - Validation:
+    - Visual verification screenshot captured from live staging Hosted UI login route after deploy.
+    - `cd infra && npm run smoke:runtime` passed for `dev` + `staging`.
+- Live staging rollout + real-auth browser validation completed for Slice 2-5 UI:
+  - Web image build/push:
+    - Built from repo `./web` and pushed to ECR:
+      - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+      - digest: `sha256:0f610ebb095287e82e683f3df19da1621d6bd6a45e177da1a6140c5a14838679`
+  - Staging service rollout:
+    - Forced ECS redeploy on:
+      - cluster: `unity-appeals-staging-v2-cluster`
+      - service: `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+    - Deployment reached `PRIMARY rolloutState=COMPLETED`.
+  - Post-rollout runtime validation:
+    - `cd infra && npm run smoke:runtime` passed (`dev` + `staging`).
+  - Real-auth browser smoke on live staging:
+    - Added script: `web/scripts/smoke-live-staging-playwright.mjs`.
+    - Executed against `https://app.oncologyexecutive.com` with Hosted UI login.
+    - Result: `staging browser smoke passed`.
+    - Evidence:
+      - created case title: `Smoke Live 2026-02-23T18:28:47.978Z`
+      - navigated document URL:
+        - `https://app.oncologyexecutive.com/document/9ae204d4-c0af-4888-90d3-fbd492dbf987`
+    - Validated interactions:
+      - `/app` render + create case flow
+      - `/document/:id` render
+      - Slice 5 surfaces present (`Pilot Metrics`, `Org Default Logo`, `Case Override Logo`)
+      - satisfaction notes save feedback path
+- Lambda runtime deprecation remediation completed (Node.js 20.x -> Node.js 22.x):
+  - Updated CDK runtime for export scheduler Lambda:
+    - `infra/lib/infra-stack.ts`
+    - `ExportQueueSchedulerFn` now uses `lambda.Runtime.NODEJS_22_X`.
+  - Deployments:
+    - `npx cdk deploy InfraStack --require-approval never` passed.
+    - `npx cdk deploy InfraStack-staging-v2 -c environment=staging --require-approval never` passed.
+  - Post-deploy validation:
+    - `cd infra && npm run build` passed.
+    - `cd infra && npm run test` passed.
+    - `cd infra && npm run smoke:runtime` passed for `dev` and `staging`.
+    - `cd infra && npm run check:endpoint-policies` passed.
+  - Result:
+    - Canonical app stacks are now off Node.js 20.x for stack-managed Lambda resources in this repo.
+    - Account scan (`aws lambda list-functions` across all regions) returned no remaining `nodejs20.x` Lambdas.
+- Interactive browser smoke automation executed for redesigned `/app` and `/document/[id]`:
+  - Added Playwright smoke script:
+    - `web/scripts/smoke-ui-playwright.mjs`
+  - Installed Playwright tooling for local browser-based validation:
+    - `@playwright/test` in `web/package.json` devDependencies.
+  - Executed local browser-driven smoke against live `next dev`:
+    - Command run: local `DEV_BYPASS_AUTH=true` dev server on `127.0.0.1:3010` + `node scripts/smoke-ui-playwright.mjs`.
+    - Result: `playwright ui smoke passed`.
+    - Validated flows:
+      - `/app` render, case search/filter, create flow navigation to `/document/:id`.
+      - `/document/:id` render plus Slice 5 controls (`Org Default Logo`, `Case Override Logo`, `Pilot Metrics`) and satisfaction note persistence check.
+  - Scope note:
+    - This smoke uses browser automation with mocked API responses and test auth cookie to validate UI interaction behavior deterministically.
+    - Separate real Hosted UI + staging auth clickthrough remains advisable as final environment verification.
+- Phase 4.2 Slice 5 implementation completed locally in web workspace:
+  - Added organization-logo governance UX in editor:
+    - org default logo upload/persistence
+    - case-level override upload/persistence
+    - clear override/default controls
+    - file: `web/src/app/document/[id]/workspace.tsx`
+  - Added pilot metrics instrumentation for discovery KPIs:
+    - draft time capture (`first draft requested -> first draft ready`)
+    - follow-up question count (user messages after first draft readiness)
+    - satisfaction score (1-5) + notes capture
+    - per-thread local persistence in browser storage
+    - files:
+      - `web/src/lib/pilot-metrics.ts`
+      - `web/src/lib/pilot-metrics.test.ts`
+      - `web/src/app/document/[id]/workspace.tsx`
+  - Validation:
+    - `cd web && npm run test` passed (`41` tests).
+    - `cd web && npm run build` passed.
+    - Local route smoke: `GET /document/smoke-thread` with auth cookie returned `200`.
+  - Remaining validation gap:
+    - Full interactive browser verification still pending for live logo upload/override persistence and satisfaction-entry UX.
+
+## Latest Session Updates (`2026-02-24`)
+- Hosted UI branding polish completed and deployed to staging custom domain:
+  - Removed busy decorative treatment from login surface and simplified the background treatment for a cleaner first impression.
+  - Final hosted login now uses Overture logo + Overture color system without the prior orbit background motif.
+  - Validation:
+    - Live Hosted UI route checked on `https://app.oncologyexecutive.com/login` after deploy.
+- App favicon metadata and branded icon assets completed:
+  - Added app icon assets:
+    - `web/src/app/icon.png`
+    - `web/src/app/apple-icon.png`
+  - Updated metadata icon wiring:
+    - `web/src/app/layout.tsx`
+  - Validation:
+    - Staging HTML head includes icon/apple icon links.
+    - Icon asset URLs return `200`.
+- `/app` left rail interaction redesign refined and deployed:
+  - File: `web/src/app/app/page.tsx`
+  - Behavior now implemented:
+    - Hamburger reliably collapses/expands rail.
+    - Width transition animates open/close (slide behavior).
+    - Label text uses quick fade in/out to remove jitter.
+    - Open/closed icon anchors kept in matching positions.
+    - Top-right magnifier triggers animated search-field expansion (replaces old static search row).
+    - Search filters patient list dynamically as the query changes.
+    - New Patient action is icon-first; label appears only when expanded.
+    - Patient list uses compact row density and staged reveal (`More` pagination).
+    - Bottom reserved settings area present with gear + `Settings & Help` (text hidden when collapsed).
+  - Visual tuning performed:
+    - Reduced collapsed rail width incrementally to center icon stack.
+    - Narrowed expanded rail width to reduce horizontal footprint.
+    - Aligned `Patients` heading with surrounding content and reduced heading scale.
+  - Validation:
+    - `cd web && npm run test` passed for these iterations.
+    - Production image built/pushed and staging ECS service forced to new deployment, rollout reached `PRIMARY/COMPLETED`.
+- Known active gap:
+  - Some requested sidebar micro-polish remains subjective and should be validated with another live visual pass before locking styling.
+- Phase 4.2 Slice 2/3/4 implementation completed locally in web workspace:
+  - Slice 2 (dynamic intake + checklist + staged progress):
+    - Added shared workspace intelligence engine:
+      - `web/src/lib/workspace-intelligence.ts`
+      - `web/src/lib/workspace-intelligence.test.ts`
+    - Added dynamic intake model inference + editable intake form in document workspace:
+      - `web/src/app/document/[id]/workspace.tsx`
+    - Added required/recommended checklist engine UI and staged-progress indicators:
+      - `web/src/app/document/[id]/workspace.tsx`
+  - Slice 3 (live-update undo + version dropdown/revert + smart orchestration):
+    - Added smart single-button draft orchestration (`generate`/`revise` intent routing) and prompt-policy addendum:
+      - `web/src/app/document/[id]/workspace.tsx`
+    - Added live-update undo stack for chat/generate/revise/revert flows:
+      - `web/src/app/document/[id]/workspace.tsx`
+    - Added version dropdown selection and explicit revert action that writes a new revision:
+      - `web/src/app/document/[id]/workspace.tsx`
+  - Slice 4 (trusted evidence/policy/legal/comparative behavior):
+    - Added citation trust analysis and warnings (trusted source constraints + references checks):
+      - `web/src/lib/workspace-intelligence.ts`
+      - `web/src/app/document/[id]/workspace.tsx`
+    - Added policy/legal relevance logic and non-legal-advice prompting guidance:
+      - `web/src/lib/workspace-intelligence.ts`
+      - `web/src/app/document/[id]/workspace.tsx`
+    - Added comparative-treatment recommendation signals in checklist/reasoning logic:
+      - `web/src/lib/workspace-intelligence.ts`
+- `/app` case list enhancements added for discovery alignment:
+  - Added search filtering (partial match) while preserving existing sort-by-updated behavior:
+    - `web/src/app/app/page.tsx`
+- Local validations for this implementation:
+  - `cd web && npm run test` passed (`38` tests; includes new `workspace-intelligence` test coverage).
+  - `cd web && npm run build` passed.
+  - Local protected-route render smoke (HTTP-level surrogate for manual browser smoke):
+    - Without auth cookie: `/app` and `/document/:id` return `307` to `/login`.
+    - With test cookie: `/app` and `/document/smoke-thread` return `200` and render updated shell HTML.
+  - Note: Full interactive browser smoke (real Hosted UI login + clickthrough interactions) remains pending in this environment.
+- Product-discovery capture completed for next build slices:
+  - Added decision-complete product requirements doc: `docs/PRODUCT-DISCOVERY.md`.
+  - Captured UX/IA direction, intake rules, checklist behavior, evidence/policy/legal constraints, citation trust rules, versioning expectations, logo governance, and pilot metrics.
+  - This document is the source of truth for Phase 4.2 slices.
+- UI design shell pass (Slice 1) completed locally (not yet manually re-smoked after redesign):
+  - Applied calm/sophisticated/trust visual system and responsive layout polish.
+  - Updated UI shell files:
+    - `web/src/app/globals.css`
+    - `web/src/app/app/page.tsx`
+    - `web/src/app/document/[id]/workspace.tsx`
+  - Local validation after redesign:
+    - `cd web && npm run test` passed.
+    - `cd web && npm run build` passed.
+- Custom domain + Hosted UI deployment completed for staging:
+  - DNS authority clarification:
+    - `oncologyexecutive.com` is delegated to GoDaddy authoritative nameservers (`ns21.domaincontrol.com`, `ns22.domaincontrol.com`), not cPanel zone files.
+  - Certificate + DNS:
+    - Requested ACM cert (us-east-1): `arn:aws:acm:us-east-1:726792844549:certificate/26136e62-e5a1-4fb8-8ed1-87cfab192209`.
+    - Added authoritative DNS CNAME records in GoDaddy:
+      - `app.oncologyexecutive.com -> InfraS-Unity-iGMyoO90DG4I-1920092028.us-east-1.elb.amazonaws.com`
+      - `_f0ba041acb7efd33019de95421d4906a.app.oncologyexecutive.com -> _6fa0c9980f7088050778c5b17133aa0f.jkddzztszm.acm-validations.aws`
+    - ACM status reached `ISSUED`.
+  - Infra deployment:
+    - `InfraStack-staging-v2` deployed successfully with:
+      - ALB HTTPS listener + HTTP redirect
+      - Cognito Hosted UI domain + OAuth callback/logout updates
+  - Runtime and endpoint validations:
+    - `curl -I https://app.oncologyexecutive.com/login` returned `200`.
+    - `curl -I https://app.oncologyexecutive.com/auth/login?next=/app` returned `307` to Cognito authorize with callback `https://app.oncologyexecutive.com/auth/callback`.
+    - `curl -I https://app.oncologyexecutive.com/auth/logout?next=/login` returned `307` to Cognito logout with logout URI `https://app.oncologyexecutive.com/login`.
+    - `cd infra && npm run smoke:runtime` passed for `dev` + `staging`.
+    - `cd infra && npm run check:endpoint-policies` passed.
+  - Runtime smoke script default updated for staging HTTPS custom domain:
+    - `infra/scripts/runtime-smoke.sh` now defaults `STAGING_ALB_URL=https://app.oncologyexecutive.com`.
+  - Auth redirect correctness fix:
+    - Added forwarded-origin resolution for auth routes behind ALB in `web/src/lib/hosted-auth.ts` and auth route handlers.
+- Phase 4 Milestone 4 (auth-aware route behavior with Cognito Hosted UI) implemented:
+  - Added Hosted UI auth flow helper: `web/src/lib/hosted-auth.ts`.
+  - Added auth routes:
+    - `GET /auth/login` (PKCE + state initiation, redirect to Cognito authorize endpoint)
+    - `GET /auth/callback` (authorization-code exchange, secure token cookie set)
+    - `GET /auth/logout` (clear local auth cookies, redirect to Cognito logout endpoint)
+  - Replaced scaffold login page with Hosted UI entry UX:
+    - `web/src/app/login/page.tsx` now routes users through `/auth/login?next=...` and shows callback error states.
+  - Updated backend auth parser to accept secure auth cookies in addition to bearer header:
+    - `web/src/lib/auth.ts` now validates JWT from `id_token`/`access_token` cookies when header is absent.
+  - Updated frontend pages with sign-out controls:
+    - `web/src/app/app/page.tsx`
+    - `web/src/app/document/[id]/workspace.tsx`
+  - Added infra support for Hosted UI and OAuth authorization-code flow:
+    - `infra/lib/infra-stack.ts`:
+      - Cognito domain creation (`cognitoHostedUiDomainPrefix`)
+      - OAuth config (`authorizationCodeGrant`, callback URLs, logout URLs, Cognito provider)
+      - runtime env injection for `COGNITO_HOSTED_UI_DOMAIN`
+    - `infra/cdk.json`:
+      - Added per-environment Cognito Hosted UI domain prefixes and callback/logout URL lists (localhost + canonical ALB URLs)
+  - Validation:
+    - `cd web && npm run test` passed (`33` tests).
+    - `cd web && npm run build` passed.
+    - `cd infra && npm run build` passed.
+    - `cd infra && npm run test` passed.
+    - `cd infra && npm run check:endpoint-policies` passed.
+  - Manual browser smokes and deploy-time Hosted UI verification remain pending in this session.
+- Phase 4 Milestone 3 (document export UX) implemented in `/document/[id]`:
+  - Extended frontend API client in `web/src/lib/client-api.ts` with:
+    - `requestDocumentExport(documentId, format)`
+    - `getDocumentExportStatus(documentId, exportId)`
+  - Added export UX to `web/src/app/document/[id]/workspace.tsx`:
+    - queue export controls for `PDF` and `DOCX`
+    - live export status panel (`queued`, `processing`, `completed`, `failed`)
+    - background polling every 3 seconds while status is non-terminal
+    - download action when `status=completed` and `downloadUrl` is present
+  - Validation:
+    - `cd web && npm run test` passed (`33` tests).
+    - `cd web && npm run build` passed.
+  - Manual browser smoke for `/document/:threadId` export queue/download flow remains pending in this session.
+- Phase 4 Milestone 2 (`/document/[id]` live chat + generate/revise) implemented:
+  - Added tenant-scoped, auth-required read APIs:
+    - `GET /api/threads/:threadId/messages`
+    - `GET /api/threads/:threadId/documents`
+    - `GET /api/documents/:id`
+  - Added API handler modules:
+    - `web/src/lib/api-handlers/thread-messages.ts`
+    - `web/src/lib/api-handlers/thread-documents.ts`
+    - `web/src/lib/api-handlers/document-detail.ts`
+  - Added API route handlers:
+    - `web/src/app/api/threads/[threadId]/messages/route.ts`
+    - `web/src/app/api/threads/[threadId]/documents/route.ts`
+    - `web/src/app/api/documents/[id]/route.ts`
+  - Added handler tests for auth + tenant-boundary + success mapping:
+    - `web/src/lib/api-handlers/thread-messages.test.ts`
+    - `web/src/lib/api-handlers/thread-documents.test.ts`
+    - `web/src/lib/api-handlers/document-detail.test.ts`
+  - Replaced scaffold document page with live workspace:
+    - server wrapper: `web/src/app/document/[id]/page.tsx`
+    - client workspace: `web/src/app/document/[id]/workspace.tsx`
+  - `/document/:threadId` now supports:
+    - hydration via read APIs (messages + generated documents + selected doc content).
+    - live chat send via `POST /api/chat/:threadId/message`.
+    - live generate via `POST /api/documents/:threadId/generate`.
+    - live revise via `POST /api/documents/:documentId/revise`.
+    - auth-aware `401` redirect to `/login?next=/document/:threadId`.
+  - Validation:
+    - `cd web && npm run test` passed (`33` tests).
+    - `cd web && npm run build` passed.
+  - Manual browser smoke for `/document/:threadId` hydrate/chat/generate/revise flow remains pending in this session.
+- Phase 4 Milestone 1 (`/app` live threads list/create) implemented:
+  - Added typed frontend API client: `web/src/lib/client-api.ts`.
+  - Replaced scaffold `/app` page with live API-backed UX: `web/src/app/app/page.tsx`.
+  - `/app` now supports:
+    - live `GET /api/threads` load with loading/empty/error states and retry.
+    - live `POST /api/threads` create flow with inline validation/error states.
+    - immediate navigation to `/document/:threadId` after successful create.
+    - auth-aware `401` redirect to `/login?next=/app`.
+  - Validation:
+    - `cd web && npm run test` passed.
+    - `cd web && npm run build` passed.
+  - Manual browser smoke for `/app` create-and-redirect flow remains pending in this session.
 - Post-MVP planning handoff prepared:
   - Phase 4 (App Build) added to `docs/MASTER-PLAN.md`.
   - Planning priority set to frontend productization (`/app` + `/document/[id]` live API wiring and UX completion).
@@ -177,7 +763,7 @@ Build an MVP prior-authorization appeal application that:
 - SNS alarm verification:
   - Synthetic alarm transitions executed for dev + staging-v2 (`ALARM` then `OK`) at ~`2026-02-22T16:49Z`.
   - CloudWatch alarm history shows successful action execution to SNS topics in both environments.
-  - Alarm recipient config updated to `ben@unityhealthtech.com` and deployed to dev + staging-v2.
+  - Alarm recipient config updated to operator-owned mailbox and deployed to dev + staging-v2.
   - Inbox delivery proof now confirmed by operator for both dev and staging-v2 alarms.
   - `dev.user@unityappeals.local` stale entries remain in `PendingConfirmation`; AWS does not allow manual unsubscribe without a real subscription ARN, so these must age out automatically.
 - Endpoint policy drift checks:
@@ -248,10 +834,198 @@ Build an MVP prior-authorization appeal application that:
      - `InfraStack-ecs-running-tasks-low`
      - `InfraStack-staging-v2-ecs-running-tasks-low`
 
+## Latest Session Updates (`2026-02-28`)
+- Identity/access commercialization foundation implemented (web + infra):
+  - Added migration:
+    - `web/db/migrations/0003_access_control_onboarding.sql`
+  - New schema foundations:
+    - `organization`
+    - `user_identity`
+    - `organization_membership`
+    - `baa_acceptance`
+    - `org_subscription`
+    - `onboarding_state`
+    - `enterprise_contact_request`
+  - Backfill behavior included for existing users/orgs so current environments remain usable.
+- Auth context + tenant resolver refactor:
+  - `web/src/lib/auth.ts` now allows token parsing without requiring `custom:tenant_id` claim.
+  - `web/src/lib/tenant-context.ts` now resolves/bootstraps home organization + membership and returns org/subscription/BAA/onboarding state.
+- New profile/onboarding API surface:
+  - `GET /api/profile/status`
+  - `POST /api/profile/accept-baa`
+  - `POST /api/profile/subscription`
+  - `POST /api/profile/onboarding`
+  - `POST /api/profile/enterprise-request`
+- UX gating and profile routes:
+  - Added protected onboarding route: `/onboarding`
+  - Added profile route: `/app/profile`
+  - `/app` and `/document/[id]` now check profile access status and redirect to onboarding gates when required.
+  - Settings/Profile links in `/app` and `/document/[id]` now route to `/app/profile`.
+- Role model additions:
+  - Introduced role taxonomy helpers in `web/src/lib/rbac.ts` (`org_owner`, `org_admin`, `case_contributor`, `reviewer`, `read_only`).
+  - Thread-create route now checks workspace access + permission.
+- Cognito policy changes (infra):
+  - `infra/lib/infra-stack.ts`
+    - `selfSignUpEnabled: true`
+    - `mfa: REQUIRED`
+    - `mfaSecondFactor.otp: true` (sms disabled)
+- Validation performed this session:
+  - `cd web && npm run test` passed (`41` tests).
+  - `cd web && npm run build` passed.
+  - `cd infra && npm run build` passed.
+  - `cd infra && npm run test` passed.
+  - `cd infra && npm run check:endpoint-policies` initially failed on drift for `vpce-0a7aa949562b1cfc5`; remediated with `npm run apply:endpoint-policies`; subsequent `npm run check:endpoint-policies` passed.
+- Staging deployment completed in correct order:
+  1. Built and pushed web image:
+     - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+     - digest: `sha256:375b67994ccc48352770bc349f4b1759de76488fe9ff84218c75e169ef3668b1`
+  2. Applied DB migration in-VPC via one-off ECS task:
+     - task: `arn:aws:ecs:us-east-1:726792844549:task/unity-appeals-staging-v2-cluster/5a5935b25418466fbb8c84f020b9a6fd`
+     - result: `exitCode=0`
+  3. Deployed staging stack:
+     - `npx cdk deploy InfraStack-staging-v2 -c environment=staging --require-approval never`
+     - included Cognito required-MFA and self-signup config + new task definition revision
+  4. Post-deploy runtime:
+     - ECS service primary deployment completed on task definition `InfraStackstagingv2WebTaskDef0200C998:9`
+     - running container confirmed on pushed digest above.
+  5. Post-deploy checks:
+     - `curl -I https://app.oncologyexecutive.com/login` => `200`
+     - `curl -I https://app.oncologyexecutive.com/app` => `307 -> /login?next=%2Fapp`
+     - `cd infra && npm run check:endpoint-policies` => pass
+     - `cd infra && npm run smoke:runtime` => `dev` pass; `staging` auth step fails due newly required MFA (expected behavior; smoke script needs MFA-aware auth path).
+- Remaining gap in this slice:
+  - Enterprise verification lifecycle/admin conversion path is not yet implemented end-to-end (request capture exists; approval workflow pending).
+- Hotfix (`2026-02-28`) for staging 500 on admin sign-in/new-thread:
+  - Symptom: `/api/profile/status` and `/api/threads` returned `500` with `permission denied for table user_identity`.
+  - Root cause: app DB role lacked grants on new onboarding/access tables introduced in `0003`.
+  - Fix:
+    - Added migration `web/db/migrations/0004_grant_app_role_access_onboarding.sql`.
+    - Rebuilt/pushed image digest `sha256:8cdf737372bbc287f75844f283a1c020bff8655e59ba9bc66c58c77e145a4fd9`.
+    - Ran one-off in-VPC migrator task (exit `0`) and forced ECS rollout.
+  - Verification:
+    - Running task digest now `sha256:8cdf737372bbc287f75844f283a1c020bff8655e59ba9bc66c58c77e145a4fd9`.
+    - New running-task logs show clean startup; no fresh permission-denied entries observed.
+- Profile/security policy slice implemented locally (`2026-02-28`):
+  - Added migration:
+    - `web/db/migrations/0005_profile_security_support.sql`
+  - Added policy engine:
+    - `web/src/lib/profile-policy.ts`
+    - role/org-state driven field-level editability and action-level controls.
+  - Added new API routes:
+    - `GET|PATCH /api/profile/me`
+    - `POST /api/profile/email-change-request`
+    - `GET /api/profile/security/mfa-status`
+    - `POST /api/profile/security/password-reset-link`
+    - `POST /api/admin/impersonation/start`
+    - `POST /api/admin/impersonation/stop`
+  - Added profile UI updates:
+    - `web/src/app/app/profile/page.tsx`
+    - editable/locked fields with policy-aware reasons, email change request path, and security section.
+  - Added tests:
+    - `web/src/lib/profile-policy.test.ts`
+    - `web/src/lib/super-admin.test.ts`
+  - Validation completed:
+    - `cd infra && npm run build` passed.
+    - `cd infra && npm run test` passed.
+    - `cd infra && npm run check:endpoint-policies` passed.
+    - `cd web && npm run test` passed (`47` tests).
+    - `cd web && npm run build` passed.
+  - Staging release progress:
+    - Web image built/pushed:
+      - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+      - digest: `sha256:43b16851b81b449cc4b50dba7cbcdd364a99ec31a48e868825fc1ab7024420aa`
+    - Connectivity + migration troubleshooting completed:
+      - AWS control-plane failures were isolated to sandbox DNS (host-level AWS connectivity is healthy).
+      - Initial in-VPC migration failures were caused by:
+        1. ECS container missing `aws` CLI for `migrate:secret`.
+        2. Migration task still using task-definition `DATABASE_URL` (app role) because `run-migrations.mjs` prioritizes `DATABASE_URL` over host/user vars.
+      - Resolution:
+        - Ran migration task with explicit migrator `DATABASE_URL` override (instead of `migrate:secret`).
+        - Ensured required DB bootstrap state with one-off admin in-VPC tasks:
+          - `CREATE EXTENSION IF NOT EXISTS pgcrypto`
+          - schema/role grants for `unity_migrator` and `unity_app` usage on `public`.
+      - Evidence:
+        - Successful migration task:
+          - `arn:aws:ecs:us-east-1:726792844549:task/unity-appeals-staging-v2-cluster/33e7720ab7a541b1922ad70ae2566efc`
+          - `exitCode=0`
+        - Migration verification task output:
+          - `{"applied":true,"version":"0005_profile_security_support.sql"}`
+    - Staging rollout completed:
+      - Forced ECS redeploy completed with `PRIMARY rolloutState=COMPLETED`.
+      - Running task digest confirmed:
+        - `sha256:43b16851b81b449cc4b50dba7cbcdd364a99ec31a48e868825fc1ab7024420aa`
+      - Endpoint checks:
+      - `https://app.oncologyexecutive.com/login` => `200`
+      - `https://app.oncologyexecutive.com/app` => `307` redirect to `/login?next=%2Fapp`
+- Super-admin UI surfaces implemented and deployed (`2026-02-28`):
+  - UI integration:
+    - Added global super-admin banner component with active view-as status + quick org/user switch controls:
+      - `web/src/components/super-admin-banner.tsx`
+    - Banner rendered on both primary work surfaces:
+      - `web/src/app/app/page.tsx`
+      - `web/src/app/document/[id]/workspace.tsx`
+    - Settings menus in both surfaces now include a `Super Admin` entry linking to `/app/super-admin`.
+    - Added dedicated super-admin page with:
+      - view-as controls
+      - active session details
+      - impersonation history table
+      - file: `web/src/app/app/super-admin/page.tsx`
+  - API support endpoints added:
+    - `GET /api/admin/impersonation/context`
+    - `GET /api/admin/impersonation/users`
+    - `GET /api/admin/impersonation/history`
+    - `POST /api/admin/impersonation/start` hardened with active-membership validation and transactional session replacement.
+    - `POST /api/admin/impersonation/stop`
+  - Client API contract additions:
+    - `web/src/lib/client-api.ts` (`SuperAdminContext`, org/user/history types + request helpers).
+  - Validation:
+    - `cd web && npm run test` passed (`47` tests).
+    - `cd web && npm run build` passed.
+  - Staging rollout evidence:
+    - Pushed image digest:
+      - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+      - `sha256:d0c3b603158866e348317069368bd4acfef8845957c0c0bb36cba491cae4d9b3`
+    - Forced ECS redeploy on:
+      - cluster: `unity-appeals-staging-v2-cluster`
+      - service: `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+    - ECS deployment reached:
+      - `PRIMARY rolloutState=COMPLETED`
+  - Note:
+    - DNS lookups for `app.oncologyexecutive.com` remain intermittently flaky from this execution environment; ECS rollout and build/test artifacts above are the release evidence for this change set.
+
 ## Known Gaps / Next Priority Work
-1. Complete Phase 4 frontend productization (replace scaffold pages with live production UX).
-2. Execute deferred post-launch cleanup item: stale SNS pending placeholders for `dev.user@unityappeals.local` (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
-3. Execute deferred post-launch cleanup item: superseded log groups with `retentionInDays = None` where safe (owner: Engineering, target window `2026-03-01` to `2026-03-15` UTC).
+1. Add automated test coverage for new profile endpoints and onboarding gating behavior.
+2. Complete enterprise verification/admin conversion workflow and seat management.
+3. Integrate production billing provider for paywall (replace manual subscription activation path).
+4. Decide backend persistence/reporting plan for pilot metrics beyond browser-local storage.
+
+## 2026-02-28 - Org-First Onboarding + Invite/Approval Flow (local implemented)
+- Scope delivered:
+  - Removed solo-first onboarding UX path and replaced with organization-required setup flow:
+    - create organization as owner
+    - join organization with invite code (approval required).
+  - Added backend schema migration:
+    - `web/db/migrations/0006_org_join_flow.sql`
+      - `organization_invite_code`
+      - `organization_join_request`
+      - onboarding fields `organization_confirmed_at`, `pending_join_request_id`.
+  - Added new API endpoints:
+    - `POST /api/profile/organization/setup`
+    - `GET/POST /api/profile/organization/invites`
+    - `GET/POST /api/profile/organization/join-requests`
+  - Updated access gating:
+    - new gates `require_org_selection`, `pending_org_join_approval`
+    - route mapping to `/onboarding?step=organization` and `/onboarding?step=join-pending`.
+  - Updated profile page:
+    - removed enterprise contact-sales block
+    - added org-admin invite generation and pending join-request approve/reject controls.
+- Policy update:
+  - Profile email-change self-service now owner-only (non-owner users are org-managed).
+- Validation evidence:
+  - `cd web && npm run test` passed (47 tests).
+  - `cd web && npm run build` passed.
+- Deployment note:
+  - Not deployed in this change record yet; migration `0006_org_join_flow.sql` must run before web rollout to avoid runtime API errors on new organization routes.
 
 ## Suggested “First Command” In Next Session
 ```bash
@@ -259,7 +1033,201 @@ cd /Users/benjaminfrank/Documents/unity-appeals-mvp
 git pull
 ```
 
-Then continue with: `docs/MASTER-PLAN.md` Phase 4 app-build planning + implementation.
+Then continue with: regression coverage expansion and pilot metrics persistence/reporting planning.
+
+## 2026-02-28 - Super Admin QA “Fresh Signup State” (deployed)
+- Added a new super-admin QA action to reliably reset a selected user into a true pre-onboarding state for full signup re-testing.
+  - API: `POST /api/admin/qa/user-tools` action `fresh_signup`
+  - Behavior:
+    - clears Terms acceptance for selected org/user
+    - clears BAA acceptance for selected org/user
+    - resets onboarding state with:
+      - `completed_at = NULL`
+      - `organization_confirmed_at = NULL`
+      - `pending_join_request_id = NULL`
+- Added matching UI control on `/app/super-admin`:
+  - button label: `Set to fresh signup state`
+- Validation evidence:
+  - `cd web && npm run test` passed (47 tests)
+  - `cd web && npm run build` passed
+- Deployment evidence:
+  - Pushed image digest:
+    - `sha256:2a182670a8feb639adb20f4519b25cb0455ddafc0e8d202a680de9483ad75422`
+  - Forced rollout on staging ECS service:
+    - `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+  - Deployment reached `PRIMARY rolloutState=COMPLETED`.
+
+## 2026-03-02 - PHI-Minimized Prompt Context with DOB-Derived Age Bands (deployed)
+- Scope:
+  - Added shared prompt sanitization utility: `web/src/lib/prompt-sanitization.ts`.
+  - Updated all Bedrock prompt paths to use de-identified context before model call:
+    - `web/src/lib/api-handlers/document-generate.ts`
+    - `web/src/lib/api-handlers/document-revise.ts`
+    - `web/src/lib/api-handlers/chat-message.ts`
+  - DOB values are transformed into de-identified demographics for reasoning:
+    - `age_years`
+    - `age_band`
+    - `birth_year_band`
+  - Direct identifiers are redacted from model-bound prompt text (name/DOB/member-policy IDs/email/phone/SSN patterns).
+- Validation evidence:
+  - `cd web && npm run test` passed (47 tests).
+  - `cd web && npm run build` passed.
+- Deployment evidence:
+  - Pushed image digest:
+    - `sha256:8ee865db19be34c522db03e59d7f13e43d7686181ea5cb7fa3329e5f9b77ada7`
+  - Forced rollout on staging ECS service:
+    - `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+  - Rollout status confirmed:
+    - `PRIMARY rolloutState=COMPLETED` for deployment `ecs-svc/4159451236811995332`.
+
+## 2026-03-02 - Checklist Gate UX in Chat Stream + Owner/Admin Force Action (deployed)
+- Scope:
+  - Updated case workspace chat parsing/rendering to support checklist-blocked assistant cards.
+  - When draft generation is blocked by missing required checklist items, workspace now:
+    - surfaces a structured assistant message in chat with missing fields
+    - automatically switches to Chat tab for visibility
+    - shows owner/admin `Force generate` action in the card.
+  - File updated:
+    - `web/src/app/document/[id]/workspace.tsx`
+- Validation evidence:
+  - `cd web && npm run test` passed (47 tests).
+  - `cd web && npm run build` passed.
+- Deployment evidence:
+  - Pushed image digest:
+    - `sha256:22acd14e18e6fd958705646c9360124d03afbdd7787f29b25c4c14e56de95119`
+  - Forced rollout on staging ECS service:
+    - `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+  - Rollout status confirmed:
+    - `PRIMARY rolloutState=COMPLETED` for deployment `ecs-svc/8487303093826570465`.
+
+## 2026-03-02 - Agent Workflow Stage Persistence (deployed)
+- Scope:
+  - Added persisted stage model for agentic workflow progress:
+    - migration: `web/db/migrations/0013_thread_workflow_stage.sql`
+    - stages: `intake_review`, `evidence_plan`, `draft_plan`
+    - statuses: `pending`, `blocked`, `ready`, `complete`
+  - Added tenant-scoped workflow read API:
+    - `GET /api/threads/[threadId]/workflow`
+    - handler: `web/src/lib/api-handlers/thread-workflow.ts`
+  - Wired stage updates into generation/revision paths:
+    - `web/src/lib/api-handlers/document-generate.ts`
+    - `web/src/lib/api-handlers/document-revise.ts`
+  - Updated case workspace to show live workflow stage cards and refresh them after generate/revise:
+    - `web/src/app/document/[id]/workspace.tsx`
+    - `web/src/lib/client-api.ts`
+- Validation evidence:
+  - `cd web && npm run test` passed (50 tests).
+  - `cd web && npm run build` passed.
+- Migration evidence (staging):
+  - command: `/tmp/run_staging_migration_task.sh`
+  - ECS task: `arn:aws:ecs:us-east-1:726792844549:task/unity-appeals-staging-v2-cluster/e4564225e8a3408e8aa7cc28faeb35b3`
+  - completion: `EssentialContainerExited`, container `exitCode=0`.
+- Deployment evidence:
+  - Pushed image digest:
+    - `sha256:4c688fde0ebdd6e3767ce26ada6425905f76a826713fd2e797771d3944958cf0`
+  - Forced rollout on staging ECS service:
+    - `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+  - Rollout status confirmed:
+    - `PRIMARY rolloutState=COMPLETED` for deployment `ecs-svc/8216941251561388287`.
+
+## 2026-03-02 - Super-Admin Workflow Policy GUI + Runtime Wiring (deployed)
+- Scope:
+  - Added admin workflow policy persistence:
+    - migration: `web/db/migrations/0014_admin_workflow_policy.sql`
+    - model helper: `web/src/lib/workflow-policy.ts`
+  - Added super-admin API for policy management:
+    - `GET/PATCH /api/admin/workflow/policy`
+    - `web/src/app/api/admin/workflow/policy/route.ts`
+  - Added Workflow tab in super-admin GUI with editable controls for:
+    - checklist blocking on/off
+    - owner/admin override on/off
+    - required checklist field set
+    - stage summary copy (`intake/evidence/draft` states)
+    - file: `web/src/app/app/super-admin/page.tsx`
+  - Wired document generation to consume policy at runtime:
+    - `web/src/lib/api-handlers/document-generate.ts`
+    - `web/src/app/api/documents/[id]/generate/route.ts`
+  - Added client API bindings:
+    - `web/src/lib/client-api.ts`
+- Validation evidence:
+  - `cd web && npm run test` passed (50 tests).
+  - `cd web && npm run build` passed.
+- Migration evidence (staging):
+  - command: `/tmp/run_staging_migration_task.sh`
+  - ECS task: `arn:aws:ecs:us-east-1:726792844549:task/unity-appeals-staging-v2-cluster/79540093151c4ef5b83e207c7e9b7335`
+  - completion: `STOPPED`, `EssentialContainerExited`, container `exitCode=0`.
+- Deployment evidence:
+  - Pushed image digest:
+    - `sha256:2c20bc7cb01f1ed5102a5e606348d67245d55ba139751d8a6f8e8847b0affbef`
+  - Forced rollout on staging ECS service:
+    - `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+  - Rollout status confirmed:
+    - `PRIMARY rolloutState=COMPLETED` for deployment `ecs-svc/3068301613508000770`.
+
+## 2026-03-02 - Super-Admin Workflow Policy Preview (deployed)
+- Scope:
+  - Added shared checklist-evaluation helper used by generation and admin preview to keep required-field detection consistent:
+    - `web/src/lib/workflow-checklist.ts`
+    - `web/src/lib/api-handlers/document-generate.ts` now consumes this shared helper.
+  - Added super-admin preview API for policy validation against live org threads:
+    - `GET /api/admin/workflow/policy-preview?organizationId=...&threadId=...`
+    - file: `web/src/app/api/admin/workflow/policy-preview/route.ts`
+    - response includes org thread list, selected thread summary, status (`ready|blocked|pending_context`), and missing required fields.
+  - Added Workflow-tab UI in super-admin for policy preview:
+    - thread selector + refresh action
+    - status badge, latest user-context preview, required vs missing field summaries
+    - files: `web/src/app/app/super-admin/page.tsx`, `web/src/lib/client-api.ts`
+- Validation evidence:
+  - `cd web && npm run test` passed (50 tests).
+  - `cd web && npm run build` passed.
+- Deployment evidence:
+  - Pushed image digest:
+    - `sha256:a876d2d48b7d9e47e1cdd7b15804eb5ff8ccd7f17f4889e9d92adb2cdaa93da0`
+  - Forced rollout on staging ECS service:
+    - `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+  - Rollout status confirmed:
+    - `PRIMARY rolloutState=COMPLETED` for deployment `ecs-svc/8886533831718172686`.
+
+## 2026-03-06 - n8n OSS rollout execution in staging (completed)
+- Scope:
+  - Executed in-VPC migration flow using staging migrator credentials (ECS one-off task).
+  - Completed `InfraStack-staging-v2` deploy with n8n service enabled and stable after fixes.
+  - Patched n8n infra bootstrap to avoid VPC endpoint secret-policy blocks and enforce RDS SSL:
+    - `infra/lib/infra-stack.ts`
+    - `infra/cdk.json`
+  - Built and pushed web runtime image to ECR and forced staging web ECS rollout.
+- Validation evidence:
+  - Infra checks passed:
+    - `cd infra && npm run build && npm run test && npm run check:endpoint-policies`
+  - Web tests passed:
+    - `cd web && npm run test`
+  - Local `cd web && npm run build` failed in host env with:
+    - `Cannot find type definition file for 'node 2'`
+  - Containerized production build succeeded during Docker build stage.
+- Migration evidence (staging):
+  - ECS task:
+    - `arn:aws:ecs:us-east-1:726792844549:task/unity-appeals-staging-v2-cluster/4b66a557414e467c8c2d26d4493cc70b`
+  - completion: container `web` `STOPPED`, `exitCode=0`.
+- Deployment evidence:
+  - Stack deploy:
+    - `npx cdk deploy InfraStack-staging-v2 -c environment=staging --require-approval never`
+    - final status: `UPDATE_COMPLETE`.
+  - n8n outputs:
+    - `N8nUrl=http://InfraS-Unity-qaSf85gWT2yo-356024214.us-east-1.elb.amazonaws.com`
+    - `N8nBootstrapCredentials=unityadmin:a2a2cf77dfc8b8a74e97c33fa7fc65ec`
+  - Web image push:
+    - `726792844549.dkr.ecr.us-east-1.amazonaws.com/unity-appeals-web:latest`
+    - digest: `sha256:ce11cba72b7a7bece0babed0e5d0bd3fbf5907f8df12a523a5f4826a76f4b4e0`
+  - ECS rollouts:
+    - web service `InfraStack-staging-v2-UnityAppealsWebService890D0F5F-3nGtPorPqiHM`
+      - `PRIMARY rolloutState=COMPLETED`
+      - task definition `InfraStackstagingv2WebTaskDef0200C998:13`
+    - n8n service `InfraStack-staging-v2-UnityAppealsN8nService73676820-E4ezue0y6Xl9`
+      - `rolloutState=COMPLETED`
+      - task definition `InfraStackstagingv2N8nTaskDefC755F337:4`
+- Live endpoint checks:
+  - `https://app.oncologyexecutive.com/login` returned `HTTP/2 200`.
+  - n8n URL returned `HTTP/1.1 200 OK`.
 
 ## Next Chat Prompt
 ```text
@@ -283,11 +1251,19 @@ Current state highlights:
 - Periodic export queue processing trigger is deployed.
 - Runtime smoke and alarm smoke scripts are in place.
 - CI migration smoke workflow is in place.
+- Phase 4.2 Slice 2/3/4 are implemented locally in `web`:
+  - dynamic intake + required/recommended checklist + staged progress
+  - smart update orchestration + undo + version revert controls
+  - evidence/citation trust checks + policy/legal prompting + comparative plan recommendation
+- Phase 4.2 Slice 5 is implemented locally in `web`:
+  - org default logo + case override UX and persistence
+  - pilot metrics instrumentation (draft time, follow-up count, satisfaction)
 
 Do this next (in order):
-1. In Planning Mode, create the concrete Phase 4 execution plan for frontend productization.
-2. Implement `/app` and `/document/[id]` against live APIs with acceptance checks.
-3. Execute deferred post-launch cleanup for SNS pending placeholders and superseded log groups in approved hardening window.
+1. Read and use `docs/PRODUCT-DISCOVERY.md` as product source of truth for current UI/features.
+2. Add focused regression tests around Slice 5 state persistence and instrumentation helpers as needed.
+3. Define pilot-metrics backend/reporting path if cross-session/team visibility is required.
+4. Consider promoting live staging browser smoke script to repeatable release gate.
 
 Constraints:
 - Preserve tenant isolation and PHI-disabled behavior.

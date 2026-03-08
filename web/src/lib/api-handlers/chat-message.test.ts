@@ -100,6 +100,112 @@ test("chat handler returns 422 for PHI-like input before DB access", async () =>
   assert.equal(connectCalled, false);
 });
 
+test("chat handler stores context_only message without Bedrock call", async () => {
+  let bedrockCalled = false;
+  const client = {
+    async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {
+      if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
+        return { rows: [{ id: "thread" }] as T[] };
+      }
+      if (sql.includes("INSERT INTO message") && sql.includes("RETURNING id")) {
+        return { rows: [{ id: "u1" }] as T[] };
+      }
+      return { rows: [] as T[] };
+    },
+    release() {},
+  };
+  const handle = createChatMessageHandler(
+    baseDeps({
+      async parseJsonBody<T>() {
+        return {
+          role: "user",
+          mode: "context_only",
+          content:
+            "Context for this case:\nPatient name: Ben Frank\nDOB: 1989-04-23\nSex: Male\nDiagnosis: C61\nRequested treatment: proton therapy\nDenial reason: not medically necessary\nPayer/plan: ACCESS COMMUNITY HEALTH NETWORK\nMember ID: 123456",
+        } as T;
+      },
+      findPhiFindings() {
+        return ["name"];
+      },
+      getDbPool() {
+        return {
+          async connect() {
+            return client;
+          },
+        };
+      },
+      async generateTextWithBedrock() {
+        bedrockCalled = true;
+        return "should not run";
+      },
+    }),
+  );
+
+  const response = await handle(new Request("http://localhost/api/chat"), {
+    params: Promise.resolve({ threadId: "22222222-2222-2222-2222-222222222222" }),
+  });
+  assert.equal(response.status, 201);
+  const payload = (await response.json()) as { data: { assistantMessageId: string | null; assistantReply: string | null } };
+  assert.equal(payload.data.assistantMessageId, null);
+  assert.equal(payload.data.assistantReply, null);
+  assert.equal(bedrockCalled, false);
+});
+
+test("chat handler emits checklist guidance for incomplete context_only intake", async () => {
+  let bedrockCalled = false;
+  const insertedMessages: string[] = [];
+  const client = {
+    async query<T = unknown>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> {
+      if (sql.includes("SELECT id") && sql.includes("FROM thread")) {
+        return { rows: [{ id: "thread" }] as T[] };
+      }
+      if (sql.includes("INSERT INTO message") && sql.includes("'user'")) {
+        return { rows: [{ id: "u1" }] as T[] };
+      }
+      if (sql.includes("INSERT INTO message") && sql.includes("'assistant'")) {
+        insertedMessages.push(String(params?.[2] ?? ""));
+        return { rows: [{ id: "a1" }] as T[] };
+      }
+      if (sql.includes("SELECT policy") && sql.includes("FROM admin_workflow_policy")) {
+        return { rows: [] as T[] };
+      }
+      return { rows: [] as T[] };
+    },
+    release() {},
+  };
+  const handle = createChatMessageHandler(
+    baseDeps({
+      async parseJsonBody<T>() {
+        return {
+          role: "user",
+          mode: "context_only",
+          content: "Context for this case:\nPatient name: Jane Doe\nDOB: 1989-04-23",
+        } as T;
+      },
+      getDbPool() {
+        return {
+          async connect() {
+            return client;
+          },
+        };
+      },
+      async generateTextWithBedrock() {
+        bedrockCalled = true;
+        return "should not run";
+      },
+    }),
+  );
+  const response = await handle(new Request("http://localhost/api/chat"), {
+    params: Promise.resolve({ threadId: "22222222-2222-2222-2222-222222222222" }),
+  });
+  assert.equal(response.status, 201);
+  const payload = (await response.json()) as { data: { assistantMessageId: string | null; assistantReply: string | null } };
+  assert.equal(payload.data.assistantMessageId, "a1");
+  assert.ok(payload.data.assistantReply?.includes("[[CHECKLIST_BLOCKED|"));
+  assert.equal(insertedMessages.length, 1);
+  assert.equal(bedrockCalled, false);
+});
+
 test("chat handler enforces tenant-boundary by returning 404 when thread is not found", async () => {
   const client = {
     async query<T = unknown>(sql: string): Promise<{ rows: T[] }> {

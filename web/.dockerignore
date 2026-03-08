@@ -1,11 +1,7 @@
-.git
-.next
 node_modules
-npm-debug.log*
-yarn-error.log*
-.env
-.env.*
+node_modules_corrupt*
+.next
+npm-debug.log
+.DS_Store
 coverage
-dist
-tmp
 *.local

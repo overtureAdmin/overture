@@ -16,7 +16,7 @@ const handleDocumentExportStatus = createDocumentExportStatusHandler({
   jsonError,
   jsonOk,
   getDbPool,
-  ensureTenantAndUser: async (db, auth) => ensureTenantAndUser(db as never, auth),
+  ensureTenantAndUser: async (db, auth) => ensureTenantAndUser(db as never, auth as never),
   buildExportStatusPayload,
   createDownloadUrl,
 });

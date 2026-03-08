@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Unity Appeals MVP",
-  description: "Prior authorization appeal workspace",
+  title: "Overture",
+  description: "Overture prior authorization appeal workspace",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

@@ -2,8 +2,15 @@ import { Pool, PoolClient } from "pg";
 import { AuthContext } from "@/lib/auth";
 
 export type ResolvedActor = {
+  [key: string]: unknown;
   tenantId: string;
+  organizationId: string;
+  organizationName: string;
   userId: string;
+  role: "org_owner" | "org_admin" | "case_contributor" | "reviewer" | "read_only";
+  organizationType: "solo" | "enterprise";
+  organizationStatus: "verified" | "pending_verification" | "suspended";
+  subscriptionStatus: "trialing" | "active" | "past_due" | "canceled" | "none";
 };
 
 export async function ensureTenantAndUser(
@@ -46,7 +53,13 @@ export async function ensureTenantAndUser(
 
   return {
     tenantId: auth.tenantId,
+    organizationId: auth.tenantId,
+    organizationName: auth.tenantId,
     userId: userResult.rows[0].id,
+    role: "org_owner",
+    organizationType: "solo",
+    organizationStatus: "verified",
+    subscriptionStatus: "active",
   };
 }
 

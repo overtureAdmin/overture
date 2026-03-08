@@ -15,7 +15,7 @@ const handleDocumentExport = createDocumentExportHandler({
   jsonError,
   jsonOk,
   getDbPool,
-  ensureTenantAndUser: async (db, auth) => ensureTenantAndUser(db as never, auth),
+  ensureTenantAndUser: async (db, auth) => ensureTenantAndUser(db as never, auth as never),
   insertAuditEvent: async (db, params) => insertAuditEvent(db as never, params),
 });
 

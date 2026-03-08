@@ -1,3 +1,4 @@
+
 type ExportStatusRecord = {
   id: string;
   generated_document_id: string;
@@ -12,6 +13,12 @@ type ExportStatusRecord = {
 type Actor = {
   tenantId: string;
   userId: string;
+  role?: "org_owner" | "org_admin" | "case_contributor" | "reviewer" | "read_only";
+  baaAccepted?: boolean;
+  onboardingCompleted?: boolean;
+  organizationStatus?: "verified" | "pending_verification" | "suspended";
+  organizationType?: "solo" | "enterprise";
+  subscriptionStatus?: "trialing" | "active" | "past_due" | "canceled" | "none";
 };
 
 type SqlClient = {
@@ -24,14 +31,14 @@ type SqlPool = {
 };
 
 export type DocumentExportStatusDeps = {
-  getAuthContext: (request: Request) => Promise<{ tenantId: string; userSub: string; email: string | null } | null>;
+  getAuthContext: (request: Request) => Promise<{ tokenTenantId?: string | null; tenantId?: string; userSub: string; email: string | null } | null>;
   authRequiredResponse: () => Response;
   jsonError: (message: string, status?: number) => Response;
   jsonOk: (payload: unknown, status?: number) => Response;
   getDbPool: () => SqlPool;
   ensureTenantAndUser: (
     db: SqlClient,
-    auth: { tenantId: string; userSub: string; email: string | null },
+    auth: { tokenTenantId?: string | null; tenantId?: string; userSub: string; email: string | null },
   ) => Promise<Actor>;
   buildExportStatusPayload: (
     record: ExportStatusRecord,

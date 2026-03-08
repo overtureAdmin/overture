@@ -1,3 +1,4 @@
+
 type ExportBody = {
   format: "docx" | "pdf";
 };
@@ -5,6 +6,12 @@ type ExportBody = {
 type Actor = {
   tenantId: string;
   userId: string;
+  role?: "org_owner" | "org_admin" | "case_contributor" | "reviewer" | "read_only";
+  baaAccepted?: boolean;
+  onboardingCompleted?: boolean;
+  organizationStatus?: "verified" | "pending_verification" | "suspended";
+  organizationType?: "solo" | "enterprise";
+  subscriptionStatus?: "trialing" | "active" | "past_due" | "canceled" | "none";
 };
 
 type SqlClient = {
@@ -17,7 +24,7 @@ type SqlPool = {
 };
 
 export type DocumentExportDeps = {
-  getAuthContext: (request: Request) => Promise<{ tenantId: string; userSub: string; email: string | null } | null>;
+  getAuthContext: (request: Request) => Promise<{ tokenTenantId?: string | null; tenantId?: string; userSub: string; email: string | null } | null>;
   authRequiredResponse: () => Response;
   parseJsonBody: <T>(request: Request) => Promise<T | null>;
   jsonError: (message: string, status?: number) => Response;
@@ -25,7 +32,7 @@ export type DocumentExportDeps = {
   getDbPool: () => SqlPool;
   ensureTenantAndUser: (
     db: SqlClient,
-    auth: { tenantId: string; userSub: string; email: string | null },
+    auth: { tokenTenantId?: string | null; tenantId?: string; userSub: string; email: string | null },
   ) => Promise<Actor>;
   insertAuditEvent: (
     db: SqlClient,
@@ -64,7 +71,6 @@ export function createDocumentExportHandler(deps: DocumentExportDeps) {
     try {
       await client.query("BEGIN");
       const actor = await deps.ensureTenantAndUser(client, auth);
-
       const documentResult = await client.query<{
         id: string;
         thread_id: string;

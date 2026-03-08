@@ -1,6 +1,6 @@
-# Unity Appeals MVP - Master Execution Plan
+# Overture - Master Execution Plan
 
-Last updated: 2026-02-22
+Last updated: 2026-03-08
 Owner: Engineering
 
 ## Current Position
@@ -32,6 +32,10 @@ Gate to Phase 1:
 - [ ] Re-check stale `PendingConfirmation` SNS placeholders and remove if AWS exposes valid ARN; otherwise document auto-aging behavior.
 - [ ] Remove superseded log groups with undefined retention where safe.
 - [x] Defer optional cleanup items to post-launch hardening (documented in handoff state on 2026-02-22).
+
+### 0.3 Runtime lifecycle hygiene
+- [x] Upgrade stack-managed Lambda runtime from deprecated `nodejs20.x` to supported `nodejs22.x` before AWS deprecation milestones.
+- [x] Deploy runtime upgrade to canonical dev + staging stacks and validate runtime smoke coverage.
 
 Gate to Phase 1:
 - [x] Optional cleanup either completed or explicitly deferred in this file.
@@ -90,21 +94,71 @@ Gate to Done:
 - [x] Product owner signs off on MVP acceptance criteria.
 
 ## Phase 4 - App Build (post-MVP)
-Status: Not started
+Status: In progress
+Product spec source for current UI direction: `docs/PRODUCT-DISCOVERY.md`.
 
 ### 4.1 Frontend productization
-- [ ] Replace scaffold pages (`/login`, `/app`, `/document/[id]`) with production UI tied to live APIs.
-- [ ] Implement real thread list/create UX and navigation to document workspace.
-- [ ] Implement document workspace UX (chat feed, generate/revise controls, export status/download).
-- [ ] Ensure tenant-safe auth UX and route behavior remain aligned with backend auth guards.
+- [x] Replace scaffold pages (`/login`, `/app`, `/document/[id]`) with production UI tied to live APIs.
+- [x] Implement real thread list/create UX and navigation to document workspace.
+- [x] Implement document workspace UX (chat feed + generate/revise controls) with tenant-scoped hydration APIs.
+- [x] Implement document workspace export status/download UX.
+- [x] Ensure tenant-safe auth UX and route behavior remain aligned with backend auth guards.
+- [x] Finalize staging login/app first-impression polish (Hosted UI branding, app favicon, and left-rail interaction tuning).
 
 ### 4.2 Product iteration loop
-- [ ] Define first pilot backlog (top user-facing workflow improvements).
-- [ ] Add acceptance criteria and instrumentation for each shipped slice.
+- [x] Define first pilot backlog direction and UX requirements with SME discovery interview.
+- [x] Capture decision-complete product requirements in `docs/PRODUCT-DISCOVERY.md`.
+- [x] Implement Slice 2: dynamic intake + required/recommended checklist engine + staged progress UX.
+- [x] Implement Slice 3: live-update undo + version dropdown/revert + smart single-button orchestration improvements.
+- [x] Implement Slice 4: trusted evidence/citation enforcement + policy/legal prompting logic + comparative plan recommendation.
+- [x] Implement Slice 5: organization logo defaults + per-case override UX + pilot metrics instrumentation.
+- [x] Refine checklist-gate UX to emit structured chat feedback with missing-required guidance + owner/admin force action.
+
+### 4.3 Access, Identity, and Commercialization Guardrails
+- [x] Define and implement updated role taxonomy (`org_owner`, `org_admin`, `case_contributor`, `reviewer`, `read_only`).
+- [x] Add backend organization/membership/BAA/subscription/onboarding schema foundations.
+- [x] Add post-auth gating endpoints and onboarding wizard routes for BAA -> subscription -> profile completion.
+- [x] Add profile workspace route exposing organization + role + subscription state.
+- [x] Enable Cognito self sign-up and enforce required MFA (TOTP).
+- [x] Implement policy-driven profile editing controls and profile change-request workflow (`/api/profile/me`, `/api/profile/email-change-request`).
+- [x] Add security profile APIs for MFA session status and password-management handoff (`/api/profile/security/*`).
+- [x] Ship QR-first MFA reset UX in profile (scan-based setup with manual secret fallback; remove end-user disable control).
+- [x] Add support impersonation session scaffolding (`/api/admin/impersonation/start|stop` + audited session table).
+- [x] Add super-admin operational UI surfaces (global view-as banner, quick org/user switcher, settings entry, and `/app/super-admin` history/controls page).
+- [x] Add super-admin QA user-state controls including full `fresh_signup` reset mode for repeatable onboarding-flow testing.
+- [x] Add organization invite-code + join-request approval workflow (org owners/admins can generate invite codes and approve/reject join requests).
+- [x] Replace onboarding solo path with org-first setup path (create org as owner or join org by invite code).
+- [x] Add super-admin destructive management controls (delete organization, delete organization user) with auditable admin action log history.
+- [x] Stabilize profile MFA device lifecycle endpoints by granting required Cognito MFA/admin permissions to the ECS web task role in staging.
+- [ ] Integrate production payment processor (replace manual subscription activation endpoint).
+
+### 4.4 LLM Prompt Governance and Authoring UX
+- [x] Add master + user-level system prompt model with deterministic composition into Bedrock generation paths.
+- [x] Add user-managed references (links/documents + usage notes) and include them in effective LLM context.
+- [x] Add super-admin master prompt editor and user profile LLM settings editor.
+- [x] Update case-view chat to post assistant change summary + linked updated document card after generate/revise.
+- [x] Deploy migration + web runtime update to canonical staging (`InfraStack-staging-v2`) and verify rollout completion.
+- [x] Enforce prompt de-identification pre-Bedrock and derive DOB into age/year-band context for model reasoning.
+- [x] Persist agent workflow stage objects (`intake_review`, `evidence_plan`, `draft_plan`) with tenant-scoped API + workspace rendering.
+- [x] Add super-admin workflow policy GUI + API and wire document generation to consume policy at runtime.
+- [x] Add super-admin workflow policy preview panel (org/thread selector + missing-required/blocking status) backed by admin API for real-case validation.
+- [x] Make case-view chat the primary draft/update interaction path and remove duplicate smart-update trigger from Details tab.
+- [x] Improve checklist field extraction for narrative/free-text intake and unify inference+gating parser behavior.
+- [x] Implement PHI-safe placeholder workflow in generate/revise path (de-identified prompt -> placeholder output contract -> app-side hydration for final draft render).
+- [x] Fix generation checklist false-missing behavior by evaluating required fields across recent user-thread context (not latest message only) and deploy to staging-v2.
+- [x] Add n8n OSS orchestration foundation (AWS-hosted service, super-admin orchestration policy, batch dispatch/audit APIs, and batch monitor UI scaffolding).
+- [x] Execute staged n8n rollout sequence in `InfraStack-staging-v2` with successful ECS stabilization for both web and n8n services.
+
+### 4.5 Brand Alignment (Overture)
+- [x] Replace runtime logo + favicon assets with official Overture brand files.
+- [x] Apply purple-first UI palette updates across login/workspace/settings surfaces.
+- [x] Update docs and product-facing naming from Unity branding to Overture (while preserving legacy AWS resource IDs in runbooks/evidence).
+- [x] Recovered interrupted workspace state and redeployed branded web image to `InfraStack-staging-v2` (ECR digest `sha256:6f071deb90dc3365564103219998dffa5a686caac2c43db2581644eea20de043`).
+- [x] Restore full global design system stylesheet (`web/src/app/globals.css`) after fallback regression and redeploy light, readable Overture login/app theme (ECR digest `sha256:faef59a65a9a11ad1730f505f460981caae6b931afafc1973c6f9e96efaeaccd`).
 
 ## Immediate Next 5 Tasks (strict order)
-1. Run Planning Mode to produce a concrete Phase 4 implementation plan (scope, milestones, acceptance criteria).
-2. Implement first frontend slice: `/app` threads list/create wired to live APIs.
-3. Implement second frontend slice: `/document/[id]` live chat + generate/revise actions.
-4. Implement third frontend slice: export queue/status/download UX with error states.
-5. Execute deferred post-launch infra cleanup items from Phase 0.2 in the approved window.
+1. Add automated API tests for LLM settings/admin prompt endpoints and prompt-composition edge cases (missing tables, empty override, reference ordering).
+2. Run browser signoff in staging for LLM authoring flow: profile prompt edit -> reference add -> generate/revise -> document update card navigation.
+3. Add automated API tests for new org-first endpoints (`/api/profile/organization/setup`, `/invites`, `/join-requests`) including approval/rejection edge cases.
+4. Add role-permission enforcement checks to chat/document/export handlers (currently enforced at profile/app gate layer and thread create path).
+5. Integrate production payment processor and org billing admin controls.

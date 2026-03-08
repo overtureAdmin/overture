@@ -8,6 +8,9 @@ type CognitoClaims = JWTPayload & {
   email?: string;
   aud?: string;
   client_id?: string;
+  username?: string;
+  "cognito:username"?: string;
+  amr?: string[] | string;
   "custom:tenant_id"?: string;
   tenant_id?: string;
 };
@@ -16,6 +19,7 @@ export type AuthContext = {
   tenantId: string;
   userSub: string;
   email: string | null;
+  mfaAuthenticated?: boolean;
 };
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
@@ -42,6 +46,43 @@ function getBearerToken(request: Request): string | null {
     return null;
   }
   return authorization.slice(7).trim();
+}
+
+function getCookieValue(request: Request, name: string): string | null {
+  const cookieHeader = request.headers.get("cookie");
+  if (!cookieHeader) {
+    return null;
+  }
+  const parts = cookieHeader.split(";").map((part) => part.trim());
+  for (const part of parts) {
+    if (!part.startsWith(`${name}=`)) {
+      continue;
+    }
+    const raw = part.slice(name.length + 1);
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return null;
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const sections = token.split(".");
+  if (sections.length < 2) {
+    return null;
+  }
+  try {
+    const payload = Buffer.from(sections[1], "base64url").toString("utf8");
+    const parsed = JSON.parse(payload);
+    if (typeof parsed !== "object" || parsed === null) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 async function verifyCognitoToken(token: string): Promise<CognitoClaims | null> {
@@ -101,6 +142,11 @@ async function parseClaimsFromAuthHeader(request: Request): Promise<AuthContext 
     tenantId: tenantValue,
     userSub: subValue,
     email: typeof claims.email === "string" ? claims.email : null,
+    mfaAuthenticated: Array.isArray(claims.amr)
+      ? claims.amr.includes("mfa")
+      : typeof claims.amr === "string"
+        ? claims.amr.toLowerCase().includes("mfa")
+        : false,
   };
 }
 
@@ -123,4 +169,41 @@ export async function getAuthContextOrDevFallback(request: Request): Promise<Aut
 
 export function authRequiredResponse() {
   return jsonError("Unauthorized: missing or invalid bearer token", 401);
+}
+
+export function getAccessTokenFromRequest(request: Request): string | null {
+  const bearer = getBearerToken(request);
+  if (bearer && bearer.length > 0) {
+    return bearer;
+  }
+  const cookieToken = getCookieValue(request, "access_token");
+  return cookieToken && cookieToken.length > 0 ? cookieToken : null;
+}
+
+export function getCognitoUsernameFromRequestAccessToken(request: Request): string | null {
+  const accessToken = getAccessTokenFromRequest(request);
+  if (accessToken) {
+    const payload = decodeJwtPayload(accessToken);
+    const username =
+      (typeof payload?.username === "string" && payload.username) ||
+      (typeof payload?.["cognito:username"] === "string" && payload["cognito:username"]) ||
+      (typeof payload?.sub === "string" && payload.sub);
+    if (username && username.trim().length > 0) {
+      return username.trim();
+    }
+  }
+
+  const idToken = getCookieValue(request, "id_token");
+  if (idToken) {
+    const payload = decodeJwtPayload(idToken);
+    const username =
+      (typeof payload?.["cognito:username"] === "string" && payload["cognito:username"]) ||
+      (typeof payload?.email === "string" && payload.email) ||
+      (typeof payload?.sub === "string" && payload.sub);
+    if (username && username.trim().length > 0) {
+      return username.trim();
+    }
+  }
+
+  return null;
 }

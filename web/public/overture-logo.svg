@@ -1,0 +1,21 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(0,16) scale(0.78)">
+    <rect x="0" y="198" width="164" height="14" fill="#5A108A"/>
+    <rect x="246" y="198" width="164" height="14" fill="#5A108A"/>
+    <rect x="198" y="0" width="14" height="79" fill="#5A108A"/>
+    <rect x="198" y="332" width="14" height="79" fill="#5A108A"/>
+    <rect x="331" y="58" width="14" height="64" transform="rotate(68 331 58)" fill="#5A108A"/>
+    <rect x="79" y="290" width="14" height="64" transform="rotate(68 79 290)" fill="#5A108A"/>
+    <rect x="358" y="104" width="14" height="54" transform="rotate(45 358 104)" fill="#5A108A"/>
+    <rect x="53" y="315" width="14" height="54" transform="rotate(45 53 315)" fill="#5A108A"/>
+    <rect x="287" y="27" width="14" height="69" transform="rotate(23 287 27)" fill="#5A108A"/>
+    <rect x="111" y="315" width="14" height="69" transform="rotate(23 111 315)" fill="#5A108A"/>
+    <rect x="13" y="163" width="14" height="57" transform="rotate(-67 13 163)" fill="#5A108A"/>
+    <rect x="386" y="229" width="14" height="57" transform="rotate(-67 386 229)" fill="#5A108A"/>
+    <rect x="55" y="104" width="14" height="54" transform="rotate(-45 55 104)" fill="#5A108A"/>
+    <rect x="360" y="315" width="14" height="54" transform="rotate(-45 360 315)" fill="#5A108A"/>
+    <rect x="111" y="27" width="14" height="69" transform="rotate(-23 111 27)" fill="#5A108A"/>
+    <rect x="287" y="315" width="14" height="69" transform="rotate(-23 287 315)" fill="#5A108A"/>
+  </g>
+  <text x="356" y="204" fill="#5A108A" font-family="Segoe UI, Arial, sans-serif" font-size="190" font-weight="600">overture</text>
+</svg>

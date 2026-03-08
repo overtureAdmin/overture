@@ -1,6 +1,7 @@
 import { getAuthContextOrDevFallback, authRequiredResponse } from "@/lib/auth";
 import { getDbPool } from "@/lib/db";
 import { jsonError, jsonOk, parseJsonBody } from "@/lib/http";
+import { denyIfNoPermission, getPrimaryAccessGate } from "@/lib/access";
 import { ensureTenantAndUser, insertAuditEvent } from "@/lib/tenant-context";
 
 type CreateThreadBody = {
@@ -14,7 +15,14 @@ export async function GET(request: Request) {
   }
 
   const db = getDbPool();
-  await ensureTenantAndUser(db, auth);
+  const actor = await ensureTenantAndUser(db, auth);
+  if (getPrimaryAccessGate(actor) !== "none") {
+    return jsonError("Complete onboarding and billing setup first", 403);
+  }
+  const permissionDenied = denyIfNoPermission(actor, "workspace:view");
+  if (permissionDenied) {
+    return permissionDenied;
+  }
 
   const result = await db.query<{
     id: string;
@@ -28,7 +36,7 @@ export async function GET(request: Request) {
       ORDER BY updated_at DESC
       LIMIT 100
     `,
-    [auth.tenantId],
+    [actor.tenantId],
   );
 
   return jsonOk({
@@ -57,6 +65,15 @@ export async function POST(request: Request) {
     await client.query("BEGIN");
 
     const actor = await ensureTenantAndUser(client, auth);
+    if (getPrimaryAccessGate(actor) !== "none") {
+      await client.query("ROLLBACK");
+      return jsonError("Complete onboarding and billing setup first", 403);
+    }
+    const permissionDenied = denyIfNoPermission(actor, "case:create");
+    if (permissionDenied) {
+      await client.query("ROLLBACK");
+      return permissionDenied;
+    }
     const threadTitle = body.patientCaseTitle.trim();
 
     const caseResult = await client.query<{ id: string }>(
