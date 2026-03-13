@@ -10,6 +10,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
@@ -43,6 +44,9 @@ export interface InfraEnvironmentConfig {
   readonly existingStsVpcEndpointId: string | null;
   readonly cognitoUserPoolName: string;
   readonly cognitoAppClientName: string;
+  readonly cognitoHostedUiDomainPrefix: string;
+  readonly appBaseUrl: string;
+  readonly tlsCertificateArn?: string | null;
   readonly alarmEmailRecipients: string[];
   readonly rdsBackupRetentionDays: number;
   readonly rdsPreferredBackupWindow: string;
@@ -66,13 +70,13 @@ export class InfraStack extends cdk.Stack {
 
     // App Security Group (ECS tasks) - created/managed by CDK unless imported.
     const appSg = config.appSecurityGroupId
-      ? ec2.SecurityGroup.fromSecurityGroupId(this, 'ImportedUnityAppealsAppSg', config.appSecurityGroupId, {
+      ? ec2.SecurityGroup.fromSecurityGroupId(this, 'ImportedOvertureAppSg', config.appSecurityGroupId, {
           mutable: true,
         })
-      : new ec2.SecurityGroup(this, 'UnityAppealsAppSg', {
+      : new ec2.SecurityGroup(this, 'OvertureAppSg', {
           vpc,
           securityGroupName: config.appSecurityGroupName,
-          description: 'Security group for Unity Appeals ECS app',
+          description: 'Security group for Overture ECS app',
           allowAllOutbound: true,
         });
 
@@ -113,7 +117,12 @@ export class InfraStack extends cdk.Stack {
 
     const userPool = new cognito.UserPool(this, 'UnityAppealsUserPool', {
       userPoolName: config.cognitoUserPoolName,
-      selfSignUpEnabled: false,
+      selfSignUpEnabled: true,
+      mfa: cognito.Mfa.REQUIRED,
+      mfaSecondFactor: {
+        sms: false,
+        otp: true,
+      },
       signInAliases: { email: true },
       autoVerify: { email: true },
       customAttributes: {
@@ -130,6 +139,12 @@ export class InfraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    const hostedUiDomain = userPool.addDomain('OvertureHostedUiDomain', {
+      cognitoDomain: {
+        domainPrefix: config.cognitoHostedUiDomainPrefix,
+      },
+    });
+
     const userPoolClient = userPool.addClient('UnityAppealsWebClient', {
       userPoolClientName: config.cognitoAppClientName,
       generateSecret: false,
@@ -138,6 +153,15 @@ export class InfraStack extends cdk.Stack {
         userSrp: true,
         adminUserPassword: true,
       },
+      oAuth: {
+        flows: {
+          authorizationCodeGrant: true,
+        },
+        callbackUrls: [`${config.appBaseUrl}/auth/callback`],
+        logoutUrls: [`${config.appBaseUrl}/login`],
+        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+      },
+      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
       preventUserExistenceErrors: true,
     });
 
@@ -146,11 +170,18 @@ export class InfraStack extends cdk.Stack {
     const cognitoAppClientId = userPoolClient.userPoolClientId;
     const dbPort = String(config.dbPort);
 
-    const dbSecret = secretsmanager.Secret.fromSecretCompleteArn(
-      this,
-      'ExistingDbCredentialsSecret',
-      config.dbSecretArn
-    );
+    const isCompleteSecretArn = /:secret:[^:]+-[A-Za-z0-9]{6}$/.test(config.dbSecretArn);
+    const dbSecret = isCompleteSecretArn
+      ? secretsmanager.Secret.fromSecretCompleteArn(
+          this,
+          'ExistingDbCredentialsSecret',
+          config.dbSecretArn
+        )
+      : secretsmanager.Secret.fromSecretNameV2(
+          this,
+          'ExistingDbCredentialsSecretByName',
+          config.dbSecretArn.split(':secret:').at(-1) ?? config.dbSecretArn
+        );
     const exportProcessorToken = createHash('sha256')
       .update(`${cdk.Stack.of(this).account}:${cdk.Stack.of(this).region}:${this.stackName}:export-processor:v1`)
       .digest('hex');
@@ -192,6 +223,7 @@ export class InfraStack extends cdk.Stack {
         COGNITO_REGION: cognitoRegion,
         COGNITO_USER_POOL_ID: cognitoUserPoolId,
         COGNITO_APP_CLIENT_ID: cognitoAppClientId,
+        COGNITO_HOSTED_UI_DOMAIN: hostedUiDomain.baseUrl(),
         DATABASE_HOST: config.dbHost,
         DATABASE_PORT: dbPort,
         DATABASE_NAME: config.dbName,
@@ -234,7 +266,7 @@ export class InfraStack extends cdk.Stack {
     // Web service behind an internet-facing ALB
     const webService = new ecsPatterns.ApplicationLoadBalancedFargateService(
       this,
-      'UnityAppealsWebService',
+      'OvertureWebService',
       {
         cluster,
         publicLoadBalancer: true,
@@ -257,8 +289,35 @@ export class InfraStack extends cdk.Stack {
       healthyHttpCodes: '200-399',
     });
 
+    const httpListener = webService.listener.node.defaultChild as elbv2.CfnListener;
+    httpListener.defaultActions = [
+      {
+        type: 'redirect',
+        redirectConfig: {
+          protocol: 'HTTPS',
+          port: '443',
+          statusCode: 'HTTP_301',
+        },
+      },
+    ];
+
+    if (config.tlsCertificateArn) {
+      const tlsCertificate = acm.Certificate.fromCertificateArn(
+        this,
+        'OvertureTlsCertificate',
+        config.tlsCertificateArn
+      );
+      webService.loadBalancer.addListener('OvertureHttpsListener', {
+        port: 443,
+        protocol: elbv2.ApplicationProtocol.HTTPS,
+        certificates: [tlsCertificate],
+        open: true,
+        defaultTargetGroups: [webService.targetGroup],
+      });
+    }
+
     const exportQueueSchedulerFn = new lambda.Function(this, 'ExportQueueSchedulerFn', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'index.handler',
       timeout: cdk.Duration.seconds(30),
       description: `Periodic export queue trigger for ${this.stackName}`,
