@@ -1,6 +1,6 @@
 # Overture - Master Execution Plan
 
-Last updated: 2026-03-08
+Last updated: 2026-03-12
 Owner: Engineering
 
 ## Current Position
@@ -155,10 +155,18 @@ Product spec source for current UI direction: `docs/PRODUCT-DISCOVERY.md`.
 - [x] Update docs and product-facing naming from Unity branding to Overture (while preserving legacy AWS resource IDs in runbooks/evidence).
 - [x] Recovered interrupted workspace state and redeployed branded web image to `InfraStack-staging-v2` (ECR digest `sha256:6f071deb90dc3365564103219998dffa5a686caac2c43db2581644eea20de043`).
 - [x] Restore full global design system stylesheet (`web/src/app/globals.css`) after fallback regression and redeploy light, readable Overture login/app theme (ECR digest `sha256:faef59a65a9a11ad1730f505f460981caae6b931afafc1973c6f9e96efaeaccd`).
+- [x] Codify prod HTTPS listener in CDK using ACM certificate (`tlsCertificateArn`) so ALB TLS is infrastructure-managed (no manual listener drift).
+- [x] Repair prod auth branding by redesigning app `/login` and pinning Cognito Hosted UI to classic branded CSS/logo configuration (`ManagedLoginVersion=1`, ECR digest `sha256:6bd9c6a650420b11e6312f3b573ebc549a13499f8e242b6ea825defa43ade5ed`).
+- [x] Implement premium app-native auth experience locally (sign in, create account, MFA verify/setup, forgot/reset, and redesigned onboarding shell) with Cognito-backed API routes and reusable auth primitives.
+- [x] Align CDK Cognito config with app-native create-account flow by enabling self sign-up in `infra/lib/infra-stack.ts` (deployment still required).
+- [x] Simplify and tighten the app-native auth layout/copy in prod so the login/create-account experience fits without desktop scroll and uses Overture-specific product messaging (`sha256:5a5a78a3476f1be97d4b7b78b8696b0b9d97693f1aa5a529141504f299bc38c0`).
+- [x] Reframe auth-screen copy and spacing around Overture’s actual appeal-drafting workflow, with larger toggle/button hit areas and better bottom-page spacing (`sha256:325af5d95eb754424f269cdcb188a50f80be4325d895115f174fa44d3705048c`).
+- [x] Redesign the full app-native auth entry system into a calmer asymmetric layout with a premium shared card shell across sign-in, account creation, forgot/reset password, MFA, and onboarding/legal steps (local validation: `cd web && npm run test`, `cd web && npm run build`).
+- [x] Repair account-transfer regressions affecting prod deployability by restoring the Node 22 Lambda runtime, fixing the production web Docker build, and removing runtime TypeScript installation from Next startup; verified with prod `InfraStack-prod` deploy and live `200` response from `https://app.oncologyexecutive.com/login`.
 
 ## Immediate Next 5 Tasks (strict order)
-1. Add automated API tests for LLM settings/admin prompt endpoints and prompt-composition edge cases (missing tables, empty override, reference ordering).
-2. Run browser signoff in staging for LLM authoring flow: profile prompt edit -> reference add -> generate/revise -> document update card navigation.
-3. Add automated API tests for new org-first endpoints (`/api/profile/organization/setup`, `/invites`, `/join-requests`) including approval/rejection edge cases.
-4. Add role-permission enforcement checks to chat/document/export handlers (currently enforced at profile/app gate layer and thread create path).
+1. Run browser signoff in prod for login, create account, MFA enrollment, forgot password, and onboarding transitions against the deployed app-native auth flow.
+2. Run browser signoff specifically for first-login MFA setup under Cognito-required MFA in prod.
+3. Add automated API tests for the new app-auth routes (`/api/auth/*`) including challenge, confirmation, password-reset, and MFA-setup edge cases.
+4. Add automated coverage or scripted verification for `DEPLOY_ENV=prod npm run check:endpoint-policies` so prod account-transfer regressions are caught earlier.
 5. Integrate production payment processor and org billing admin controls.

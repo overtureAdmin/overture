@@ -9,8 +9,8 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "apply:endpoint-policies": "./scripts/apply-vpc-endpoint-policies.sh us-east-1 726792844549 apply",
-    "check:endpoint-policies": "./scripts/apply-vpc-endpoint-policies.sh us-east-1 726792844549 check",
+    "apply:endpoint-policies": "./scripts/apply-vpc-endpoint-policies.sh ${DEPLOY_ENV:-dev} apply",
+    "check:endpoint-policies": "./scripts/apply-vpc-endpoint-policies.sh ${DEPLOY_ENV:-dev} check",
     "smoke:runtime": "./scripts/runtime-smoke.sh both",
     "smoke:alarms": "./scripts/alarm-smoke.sh both"
   },

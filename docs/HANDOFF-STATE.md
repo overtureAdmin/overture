@@ -15,8 +15,8 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest pushed commit at handoff: `adf36df`
-- Handoff date: `2026-02-24` (UTC)
+- Latest local commit at handoff: `4a8cfc4`
+- Handoff date: `2026-03-12` (UTC)
 
 ## What Is Implemented
 
@@ -99,6 +99,200 @@ Build an MVP prior-authorization appeal application that:
   - schema verification: `migration smoke passed`
 - `cd infra && npm run smoke:runtime` passed (`dev` + `staging`).
 - `cd infra && npm run smoke:alarms` passed (`InfraStack-alb-target-5xx`, `InfraStack-staging-v2-alb-target-5xx`).
+
+## Latest Session Updates (`2026-03-12`) - App-Native Authentication Redesign
+- Replaced the old `/login` bridge page with a new app-native auth workspace in `web/src/components/auth/auth-workspace.tsx` and `web/src/app/login/page.tsx`.
+- New auth experience now covers:
+  - sign in with remember-me, show/hide password, and inline MFA code challenge
+  - create-account wizard preserving existing business flow intent across staged steps:
+    - account details
+    - organization create/join choice
+    - profile details
+    - Terms review/acceptance
+    - BAA review/acceptance
+    - email confirmation
+    - MFA setup
+  - forgot password request
+  - reset password code + new password flow
+  - loading, success, and error states across each auth state
+- Added reusable auth design primitives in `web/src/components/auth/auth-primitives.tsx` and reused them to redesign `/onboarding` so post-auth gating no longer falls back to a visually inconsistent legacy screen.
+- Added Cognito-backed app auth APIs for password auth, confirmation, reset, MFA challenge handling, and first-time MFA setup:
+  - `web/src/app/api/auth/login/route.ts`
+  - `web/src/app/api/auth/login/mfa/route.ts`
+  - `web/src/app/api/auth/login/mfa/setup/start/route.ts`
+  - `web/src/app/api/auth/login/mfa/setup/verify/route.ts`
+  - `web/src/app/api/auth/signup/route.ts`
+  - `web/src/app/api/auth/signup/confirm/route.ts`
+  - `web/src/app/api/auth/signup/resend/route.ts`
+  - `web/src/app/api/auth/password/forgot/route.ts`
+  - `web/src/app/api/auth/password/reset/route.ts`
+- Added shared browser-auth/session helpers:
+  - `web/src/lib/cognito-browser-auth.ts`
+  - `web/src/lib/auth-session.ts`
+- Infra alignment:
+  - updated Cognito stack definition in `infra/lib/infra-stack.ts` to `selfSignUpEnabled: true` so the new create-account flow matches intended product behavior once deployed.
+- Local validation evidence:
+  - `cd web && npm run test` passed (`59/59`).
+  - `cd web && npm run build` passed.
+  - `cd infra && npm run build` passed.
+- Validation gap:
+  - `cd infra && npm run check:endpoint-policies` failed in the local shell with `AuthFailure` because current AWS credentials were not valid for `DescribeVpcEndpoints`.
+  - infra Jest execution did not return output cleanly in this shell session after the auth changes; rerun in a clean terminal before merge/deploy.
+- Deployment status:
+  - prod infra deployed:
+    - `npx cdk deploy InfraStack-prod -c environment=prod --profile overture-prod --require-approval never --output cdk.out.auth-deploy-20260312`
+    - CloudFormation updated `AWS::Cognito::UserPool` and reached `UPDATE_COMPLETE` at `2026-03-12 06:56` local deploy time.
+  - prod web runtime deployed:
+    - ECR repo: `329599631467.dkr.ecr.us-east-1.amazonaws.com/overture-web`
+    - pushed `latest` digest: `sha256:7855dfde5842dab8f46569b923edb1a4c2bdc66f67bfd280627fc64f4616aac7`
+    - ECS service forced to new deployment:
+      - cluster: `overture-prod-cluster`
+      - service: `InfraStack-prod-OvertureWebServiceC19679F7-Ap34AmOyVCGy`
+      - deployment `ecs-svc/5860433723447767262` reached `rolloutState=COMPLETED`
+    - running task verified on new digest:
+      - task `5438ddd22137408c928c776bf2ce2e0e`
+      - image digest `sha256:7855dfde5842dab8f46569b923edb1a4c2bdc66f67bfd280627fc64f4616aac7`
+  - live endpoint check:
+    - `curl -sSI https://app.oncologyexecutive.com/login` returned `HTTP/2 200`
+- Important config note:
+  - Cognito self sign-up is now enabled (`AdminCreateUserConfig.AllowAdminCreateUserOnly = false`).
+  - Follow-up completed on `2026-03-12`: Cognito user-pool MFA is now enabled at the identity-provider layer.
+  - Validation evidence:
+    - `aws cognito-idp describe-user-pool --user-pool-id us-east-1_e1n33IfQN --profile overture-prod`
+    - returned `MfaConfiguration = ON`
+  - Result:
+    - prod now enforces MFA at the Cognito/user-pool layer in addition to the app onboarding/auth flow.
+    - users without an enrolled authenticator will be driven into MFA setup during sign-in.
+- Auth UX refinement rollout completed (`2026-03-12`):
+  - Simplified the new auth workspace to reduce vertical sprawl and fit common desktop auth states without page scroll.
+  - Replaced generic enterprise/security copy with Overture-specific product language centered on payer appeals, prior auth workflows, organization-gated access, and required MFA.
+  - Reduced shell spacing and condensed the signup progress indicator so the right-side form panel remains primary.
+  - Files updated:
+    - `web/src/components/auth/auth-workspace.tsx`
+    - `web/src/components/auth/auth-primitives.tsx`
+  - Validation evidence:
+    - `cd web && npm run test` passed (`59/59`).
+    - `cd web && npm run build` passed.
+  - Deploy evidence:
+    - ECR image pushed:
+      - `329599631467.dkr.ecr.us-east-1.amazonaws.com/overture-web:latest`
+      - digest: `sha256:5a5a78a3476f1be97d4b7b78b8696b0b9d97693f1aa5a529141504f299bc38c0`
+    - ECS rollout completed:
+      - cluster: `overture-prod-cluster`
+      - service: `InfraStack-prod-OvertureWebServiceC19679F7-Ap34AmOyVCGy`
+      - deployment: `ecs-svc/5918847383571351047`
+      - running task: `6c65b3d3df024661a239884bf7b0ef77`
+      - running image digest verified: `sha256:5a5a78a3476f1be97d4b7b78b8696b0b9d97693f1aa5a529141504f299bc38c0`
+    - Live endpoint check:
+      - `curl -sSI https://app.oncologyexecutive.com/login` returned `HTTP/2 200`
+- Auth UX product-copy refinement rollout completed (`2026-03-12`):
+  - Reframed the auth entry experience around Overture’s actual workflow instead of generic “secure access” messaging.
+  - Updated the left rail to emphasize case intake, draft building, and workflow continuity.
+  - Increased padding and hit area for auth mode toggles and primary/secondary buttons.
+  - Added bottom breathing room to the auth shell and panel so the page no longer feels visually cut off.
+  - Files updated:
+    - `web/src/components/auth/auth-workspace.tsx`
+    - `web/src/components/auth/auth-primitives.tsx`
+  - Validation evidence:
+    - `cd web && npm run test` passed (`59/59`).
+    - `cd web && npm run build` passed.
+  - Deploy evidence:
+    - ECR image pushed:
+      - `329599631467.dkr.ecr.us-east-1.amazonaws.com/overture-web:latest`
+      - digest: `sha256:325af5d95eb754424f269cdcb188a50f80be4325d895115f174fa44d3705048c`
+    - ECS rollout completed:
+      - cluster: `overture-prod-cluster`
+      - service: `InfraStack-prod-OvertureWebServiceC19679F7-Ap34AmOyVCGy`
+      - deployment: `ecs-svc/8031939595019542712`
+      - running task: `92cfedcf61784dd5bedd9152b5bc70fe`
+      - running image digest verified: `sha256:325af5d95eb754424f269cdcb188a50f80be4325d895115f174fa44d3705048c`
+- Auth entry redesign completed locally (`2026-03-12`):
+  - Rebuilt the auth shell into an asymmetric two-column layout with the sign-in card as the clear focal point and a quieter editorial brand panel.
+  - Reworked all auth states to share one premium card system:
+    - sign in
+    - create account
+    - forgot password
+    - MFA verification
+    - MFA setup
+    - legal acceptance and organization onboarding steps
+  - Reduced heavy borders and equal-weight boxes in favor of softer surfaces, tighter spacing, and clearer type hierarchy.
+  - Preserved the existing Cognito/API transitions and onboarding gates while changing only presentation and component structure.
+  - Files updated:
+    - `web/src/components/auth/auth-workspace.tsx`
+    - `web/src/components/auth/auth-primitives.tsx`
+  - Validation evidence:
+    - `cd web && npm run test` passed.
+    - `cd web && npm run build` passed.
+
+## Latest Session Updates (`2026-03-12`) - AWS Account Transfer Cleanup + Prod Runtime Repair
+- Infra/runtime fixes completed:
+  - Restored the stack-managed export scheduler Lambda runtime to `nodejs22.x` in `infra/lib/infra-stack.ts` so the repo no longer regresses to deprecated `nodejs20.x`.
+  - Repaired the production web image build in `web/Dockerfile`:
+    - install dependencies before setting `NODE_ENV=production`
+    - run `next build` with dev dependencies present
+    - prune dev dependencies after build for the runtime image
+  - Removed runtime TypeScript auto-install behavior by converting `web/next.config.ts` to `web/next.config.mjs`.
+- Root cause found during deploy validation:
+  - the previous production image was starting slowly because `next start` attempted to install TypeScript dynamically at container startup
+  - that delayed readiness long enough for the ALB health check to time out on a fresh task
+- Validation evidence:
+  - `cd infra && npm run build` passed.
+  - `cd infra && npm run test` passed.
+  - `cd web && npm run test` passed.
+  - `cd web && npm run build` passed.
+  - `AWS_PROFILE=overture-prod aws sts get-caller-identity` passed for account `329599631467`.
+  - `cd infra && AWS_PROFILE=overture-prod DEPLOY_ENV=prod npm run check:endpoint-policies` passed after fixing old-account assumptions in the endpoint-policy tooling.
+- Endpoint policy tooling repairs:
+  - `infra/package.json` now routes endpoint-policy apply/check through `DEPLOY_ENV` instead of a hardcoded legacy account.
+  - `infra/scripts/apply-vpc-endpoint-policies.sh` now resolves the selected environment's account, endpoint IDs, DB/app/admin/migrator secret set, and KMS policy shape from current config plus live AWS metadata.
+  - This removed a real account-transfer defect where the repo still targeted legacy account `726792844549` for required endpoint-policy verification.
+- Production deploy evidence:
+  - infra deployed:
+    - `npx cdk deploy InfraStack-prod -c environment=prod --profile overture-prod --require-approval never`
+  - web image pushed and service updated:
+    - ECR repo: `329599631467.dkr.ecr.us-east-1.amazonaws.com/overture-web`
+    - current running image digest verified in ECS: `sha256:325af5d95eb754424f269cdcb188a50f80be4325d895115f174fa44d3705048c`
+    - cluster: `overture-prod-cluster`
+    - service: `InfraStack-prod-OvertureWebServiceC19679F7-Ap34AmOyVCGy`
+    - running task at verification: `92cfedcf61784dd5bedd9152b5bc70fe`
+  - live endpoint check:
+    - `curl -sSI https://app.oncologyexecutive.com/login` returned `HTTP/2 200` on `2026-03-12`.
+- Commits created in this session:
+  - `a3121a4` `Stabilize auth and prod infra after account transfer`
+  - `fcf0156` `Fix production web image build`
+  - `4a8cfc4` `Avoid TypeScript install during Next startup`
+    - `web/src/components/auth/auth-primitives.tsx`
+    - `web/src/components/auth/auth-workspace.tsx`
+  - Validation evidence:
+    - `cd web && npm run test` passed (`59/59`).
+    - `cd web && npm run build` passed.
+
+## Latest Session Updates (`2026-03-11`) - Prod Login Branding Repair
+- Overture login branding repaired in both layers of prod auth:
+  - app-side `/login` page redesigned in `web/src/app/login/page.tsx` with a lighter Overture-first layout, stronger hierarchy, and cleaner secure-access card.
+  - Cognito Hosted UI domain `overture-prod-auth` switched from managed login v2 to classic Hosted UI v1 for deterministic styling control.
+  - Classic Hosted UI branding now comes from checked-in asset file `infra/assets/cognito-hosted-ui-overture.css` plus `web/public/overture-logo.png`.
+- Validation evidence:
+  - `cd web && npm run test` passed (`59/59`).
+  - `cd web && npm run build` passed after excluding stale `node_modules_corrupt*` artifacts via `web/tsconfig.json`.
+  - `aws cognito-idp describe-user-pool-domain --domain overture-prod-auth ...` returned:
+    - `Status=ACTIVE`
+    - `ManagedLoginVersion=1`
+  - `aws cognito-idp get-ui-customization --user-pool-id us-east-1_e1n33IfQN --client-id 7ungj1j1mafdg0isktfqv2v2ol ...` returned:
+    - `CSSVersion=20260312025131`
+    - branded image hosted on Cognito CloudFront.
+  - Web image deployed to prod:
+    - ECR: `329599631467.dkr.ecr.us-east-1.amazonaws.com/overture-web:latest`
+    - digest: `sha256:6bd9c6a650420b11e6312f3b573ebc549a13499f8e242b6ea825defa43ade5ed`
+  - ECS rollout completed:
+    - cluster: `overture-prod-cluster`
+    - service: `InfraStack-prod-OvertureWebServiceC19679F7-Ap34AmOyVCGy`
+    - deployment `ecs-svc/8185519415351601294` reached `PRIMARY rolloutState=COMPLETED`
+  - Auth redirect verification:
+    - `curl -sSI 'https://app.oncologyexecutive.com/auth/login?next=%2Fapp'` returned `HTTP/2 307`
+    - redirect target is Cognito authorize endpoint on `https://overture-prod-auth.auth.us-east-1.amazoncognito.com/...`
+- Environment caveat:
+  - local resolver intermittently failed `curl https://app.oncologyexecutive.com/...` with `Could not resolve host`; browser access still worked and HTTPS endpoint checks returned `200/307`, so this remains a local DNS stability issue rather than an app deploy issue.
 
 ## Latest Session Updates (`2026-03-08`) - Overture Brand Rollout
 - Login/app readability hotfix + rollout completed (`2026-03-08`):
@@ -1271,3 +1465,35 @@ Constraints:
 - Make code changes directly, run build/tests/deploy/smokes as needed, and commit/push when complete.
 - Preserve unrelated local changes.
 ```
+
+## 2026-03-09 (Prod account cutover hardening + HTTPS codified)
+- Scope:
+  - Codified ALB HTTPS listener management in CDK (removed manual listener drift risk).
+  - Continued Overture naming migration for runtime-facing infra resources.
+- Code/config changes:
+  - `infra/lib/infra-stack.ts`
+    - Added optional `tlsCertificateArn` to `InfraEnvironmentConfig`.
+    - Added CDK-managed `OvertureHttpsListener` (port 443, ACM cert, forwards to app target group).
+    - Kept existing stable logical IDs where replacement would have caused named-resource conflicts (cluster/user pool/client).
+  - `infra/cdk.json`
+    - Added prod `tlsCertificateArn`:
+      - `arn:aws:acm:us-east-1:329599631467:certificate/7d4169bc-f43c-4bc3-a90d-632ab44702e8`
+    - Prod ECR repo remains `overture-web`.
+- Deployment/runtime evidence (account `329599631467`, region `us-east-1`):
+  - `npx --yes cdk deploy InfraStack-prod -c environment=prod --profile overture-prod --require-approval never`
+    - final status: `UPDATE_COMPLETE`.
+  - ALB listeners now:
+    - `80/HTTP`
+    - `443/HTTPS` (listener ARN suffix `.../e9b62e126481b649`).
+  - ECS service:
+    - `InfraStack-prod-OvertureWebServiceC19679F7-Ap34AmOyVCGy`
+    - steady-state reached during deploy.
+  - HTTPS runtime check:
+    - `curl -sSI https://app.oncologyexecutive.com/login` => `HTTP/2 200`.
+- DNS/ACM evidence:
+  - Validation CNAME resolved:
+    - `_804928576cc4966adbbbde3d1b24b397.app.oncologyexecutive.com`
+    - -> `_d88b9d33db8becf1cec502daaf5e94fa.jkddzztszm.acm-validations.aws`
+  - Certificate `7d4169bc-f43c-4bc3-a90d-632ab44702e8` status: `ISSUED`.
+- Notes:
+  - Direct HTTPS checks against raw ALB hostname will show hostname/cert mismatch by design; validate via `app.oncologyexecutive.com`.

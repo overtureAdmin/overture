@@ -94,14 +94,21 @@ Apply expected policies:
 
 ```bash
 cd infra
-npm run apply:endpoint-policies
+DEPLOY_ENV=dev npm run apply:endpoint-policies
 ```
 
 Check drift (non-zero exit on mismatch):
 
 ```bash
 cd infra
-npm run check:endpoint-policies
+DEPLOY_ENV=dev npm run check:endpoint-policies
+```
+
+Prod example:
+
+```bash
+cd infra
+AWS_PROFILE=overture-prod DEPLOY_ENV=prod npm run check:endpoint-policies
 ```
 
 ## Auth Smoke Tests
@@ -196,4 +203,43 @@ Manual invocation check:
 aws events list-rule-names-by-target \
   --region us-east-1 \
   --target-arn <EXPORT_QUEUE_SCHEDULER_LAMBDA_ARN>
+```
+
+## Prod HTTPS Management (CDK-managed)
+
+- `InfraStack` now supports `tlsCertificateArn` in environment config.
+- When set, CDK creates and manages ALB HTTPS listener (port `443`) and forwards to the app target group.
+- Keep ACM cert in `us-east-1` for ALB in this deployment.
+
+Current prod reference:
+
+- Cert ARN:
+  - `arn:aws:acm:us-east-1:329599631467:certificate/7d4169bc-f43c-4bc3-a90d-632ab44702e8`
+- Domain:
+  - `https://app.oncologyexecutive.com/login`
+- Cognito Hosted UI:
+  - domain: `overture-prod-auth`
+  - current branding mode: classic Hosted UI (`ManagedLoginVersion=1`)
+  - checked-in CSS asset: `infra/assets/cognito-hosted-ui-overture.css`
+  - checked-in logo asset: `web/public/overture-logo.png`
+
+Verification commands:
+
+```bash
+aws elbv2 describe-listeners \
+  --profile overture-prod \
+  --region us-east-1 \
+  --load-balancer-arn <PROD_ALB_ARN> \
+  --query 'Listeners[].[Port,Protocol]' --output table
+
+curl -sSI https://app.oncologyexecutive.com/login
+aws cognito-idp describe-user-pool-domain \
+  --profile overture-prod \
+  --region us-east-1 \
+  --domain overture-prod-auth
+aws cognito-idp get-ui-customization \
+  --profile overture-prod \
+  --region us-east-1 \
+  --user-pool-id us-east-1_e1n33IfQN \
+  --client-id 7ungj1j1mafdg0isktfqv2v2ol
 ```
