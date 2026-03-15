@@ -42,7 +42,7 @@ function baseDeps(overrides: Partial<DocumentReviseDeps> = {}): DocumentReviseDe
     getBedrockModelId() {
       return "model-123";
     },
-    isBedrockGuardrailError() {
+    isBedrockGuardrailError(error: unknown): error is { code: string; findings: string[] } {
       return false;
     },
     getDbPool() {

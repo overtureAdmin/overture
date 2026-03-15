@@ -1,6 +1,9 @@
 type SuperAdminAuth = {
   userSub: string;
   groups?: string[];
+  tokenTenantId?: string | null;
+  email?: string | null;
+  mfaAuthenticated?: boolean;
 };
 
 function parseSubjectAllowlist(raw: string | null): Set<string> {

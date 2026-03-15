@@ -43,7 +43,7 @@ function baseDeps(overrides: Partial<ChatMessageDeps> = {}): ChatMessageDeps {
     getBedrockModelId() {
       return "model";
     },
-    isBedrockGuardrailError() {
+    isBedrockGuardrailError(error: unknown): error is { code: string; findings: string[] } {
       return false;
     },
     getDbPool() {

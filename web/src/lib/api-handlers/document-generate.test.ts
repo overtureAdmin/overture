@@ -52,7 +52,7 @@ function baseDeps(overrides: Partial<DocumentGenerateDeps> = {}): DocumentGenera
     getBedrockModelId() {
       return "model";
     },
-    isBedrockGuardrailError() {
+    isBedrockGuardrailError(error: unknown): error is { code: string; findings: string[] } {
       return false;
     },
     getDbPool() {
