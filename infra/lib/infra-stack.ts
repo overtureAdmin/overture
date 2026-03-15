@@ -289,19 +289,19 @@ export class InfraStack extends cdk.Stack {
       healthyHttpCodes: '200-399',
     });
 
-    const httpListener = webService.listener.node.defaultChild as elbv2.CfnListener;
-    httpListener.defaultActions = [
-      {
-        type: 'redirect',
-        redirectConfig: {
-          protocol: 'HTTPS',
-          port: '443',
-          statusCode: 'HTTP_301',
-        },
-      },
-    ];
-
     if (config.tlsCertificateArn) {
+      const httpListener = webService.listener.node.defaultChild as elbv2.CfnListener;
+      httpListener.defaultActions = [
+        {
+          type: 'redirect',
+          redirectConfig: {
+            protocol: 'HTTPS',
+            port: '443',
+            statusCode: 'HTTP_301',
+          },
+        },
+      ];
+
       const tlsCertificate = acm.Certificate.fromCertificateArn(
         this,
         'OvertureTlsCertificate',
