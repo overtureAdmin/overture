@@ -37,7 +37,7 @@ export function AuthPanel(props: { children: ReactNode }) {
 
 export function AuthCard(props: { children: ReactNode }) {
   return (
-    <section className="relative w-full max-w-[470px] overflow-hidden rounded-[24px] border border-[#e3dbe9] bg-[rgba(255,255,255,0.96)] p-5 shadow-[0_24px_60px_rgba(41,20,64,0.10)] backdrop-blur md:p-7">
+    <section className="relative w-full overflow-hidden rounded-[24px] border border-[#e3dbe9] bg-[rgba(255,255,255,0.96)] p-5 shadow-[0_24px_60px_rgba(41,20,64,0.10)] backdrop-blur md:p-7">
       <div aria-hidden="true" className="absolute inset-x-0 top-0 h-24 bg-[linear-gradient(180deg,rgba(139,49,199,0.07),transparent)]" />
       <div className="relative">{props.children}</div>
     </section>
