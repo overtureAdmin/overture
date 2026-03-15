@@ -822,7 +822,10 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
 
   return (
     <AuthShell>
-      <div className={`w-full transition-[max-width] duration-300 ease-in-out ${isLegal ? "max-w-[75vw]" : isWizard ? "max-w-[560px]" : "max-w-[440px]"}`}>
+      <div
+        className="w-full transition-all duration-300 ease-in-out"
+        style={{ maxWidth: isLegal ? "75vw" : isWizard ? "560px" : "440px" }}
+      >
         <AuthCard>
           <div className="space-y-5">
             <div className="flex justify-center pb-1">
