@@ -24,7 +24,6 @@ import {
   AuthLegalCard,
   AuthLinkButton,
   AuthPrimaryButton,
-  AuthProgress,
   AuthSecondaryButton,
   AuthShell,
 } from "@/components/auth/auth-primitives";
@@ -158,34 +157,6 @@ function buildMaskedPassword(password: string) {
 }
 
 
-function AuthModeTabs(props: {
-  active: "login" | "signup";
-  onLogin: () => void;
-  onSignup: () => void;
-}) {
-  return (
-    <div className="inline-flex rounded-[15px] border border-[#e5deea] bg-[#f7f4f9] p-1">
-      <button
-        type="button"
-        onClick={props.onLogin}
-        className={`rounded-[12px] px-4 py-2 text-[13px] font-medium transition-colors duration-200 ${
-          props.active === "login" ? "bg-white text-[#34223f] shadow-[0_8px_18px_rgba(57,31,84,0.08)]" : "text-[#766b80] hover:text-[#4b3a58]"
-        }`}
-      >
-        Sign in
-      </button>
-      <button
-        type="button"
-        onClick={props.onSignup}
-        className={`rounded-[12px] px-4 py-2 text-[13px] font-medium transition-colors duration-200 ${
-          props.active === "signup" ? "bg-white text-[#34223f] shadow-[0_8px_18px_rgba(57,31,84,0.08)]" : "text-[#766b80] hover:text-[#4b3a58]"
-        }`}
-      >
-        Create account
-      </button>
-    </div>
-  );
-}
 
 function PasswordToggle(props: { visible: boolean; onToggle: () => void }) {
   return (
@@ -363,8 +334,8 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
 
   const passwordGuidance = useMemo(() => buildMaskedPassword(signup.password), [signup.password]);
   const currentHeader = authHeader(mode, loginMfaSession, signupStage);
-  const primaryTab = mode === "signup" ? "signup" : "login";
   const busy = status.kind === "busy";
+  const isWizard = mode === "signup" && signupStage !== "account";
 
   async function routeAfterAuthentication(preferredPath?: string) {
     const profile = await getProfileStatus();
@@ -813,38 +784,13 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
     }
   }
 
-  const signupSteps = [
-    { key: "account", label: "Account" },
-    { key: "organization", label: "Organization" },
-    { key: "profile", label: "Profile" },
-    { key: "legal", label: "Legal" },
-    { key: "confirm", label: "Verify" },
-    { key: "mfa", label: "Security" },
-  ];
-
   return (
     <AuthShell>
-      <div className="w-full max-w-[440px] space-y-6">
-        <div className="flex justify-center pb-2">
-          <img src="/overture-logo.png" alt="Overture" className="h-9 w-auto" />
-        </div>
+      <div className={`w-full transition-[max-width] duration-300 ease-in-out ${isWizard ? "max-w-[560px]" : "max-w-[440px]"}`}>
         <AuthCard>
           <div className="space-y-5">
-            <div className="flex justify-center">
-              <AuthModeTabs
-                active={primaryTab}
-                onLogin={() => {
-                  resetTransientState();
-                  setMode("login");
-                }}
-                onSignup={() => {
-                  resetTransientState();
-                  setMode("signup");
-                  if (signupStage === "confirm" || signupStage === "mfa") {
-                    setSignupStage("account");
-                  }
-                }}
-              />
+            <div className="flex justify-center pb-1">
+              <img src="/overture-logo.png" alt="Overture" className="h-8 w-auto" />
             </div>
 
             <div className="space-y-3">
@@ -862,8 +808,6 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
                 <AuthAlert tone="error">{error}</AuthAlert>
               </div>
             ) : null}
-
-            {mode === "signup" ? <AuthProgress steps={signupSteps} currentKey={signupStage} /> : null}
 
             {mode === "login" ? (
               <form className="space-y-4" onSubmit={loginMfaSession ? onSubmitLoginMfa : onSubmitLogin}>
