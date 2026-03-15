@@ -17,11 +17,6 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "Overture",
   description: "Overture prior authorization appeal workspace",
-  icons: {
-    icon: "/icon.png",
-    shortcut: "/icon.png",
-    apple: "/icon.png",
-  },
 };
 
 export default function RootLayout({
