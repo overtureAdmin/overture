@@ -2,17 +2,26 @@
 
 ## Canonical Stacks
 
-- Dev app stack: `InfraStack`
-- Staging app stack: `InfraStack-staging-v2`
-- Staging network stack: `NetworkStack-staging`
-- Legacy `InfraStack-staging`: deleted/decommissioned
+| Env | Account | Profile | Stacks |
+|-----|---------|---------|--------|
+| dev | `726792844549` | `default` | `InfraStack` |
+| staging | `192431908195` | `overture-staging` | `NetworkStack-staging`, `InfraStack-staging-v2` |
+| prod | `169976658679` | `overture-prod-member` | `NetworkStack-prod`, `InfraStack-prod` |
+
+Legacy: `InfraStack-staging` (deleted), old prod in `329599631467` (deleted `2026-03-15`)
 
 ## Deploy
 
 ```bash
 cd infra
+# dev
 npx cdk deploy InfraStack --require-approval never
-npx cdk deploy NetworkStack-staging InfraStack-staging-v2 -c environment=staging --require-approval never
+
+# staging
+AWS_PROFILE=overture-staging npx cdk deploy NetworkStack-staging InfraStack-staging-v2 -c environment=staging --require-approval never
+
+# prod
+AWS_PROFILE=overture-prod-member npx cdk deploy NetworkStack-prod InfraStack-prod -c environment=prod --require-approval never
 ```
 
 ## Database Migration Credentials (Standardized)
@@ -207,39 +216,36 @@ aws events list-rule-names-by-target \
 
 ## Prod HTTPS Management (CDK-managed)
 
-- `InfraStack` now supports `tlsCertificateArn` in environment config.
-- When set, CDK creates and manages ALB HTTPS listener (port `443`) and forwards to the app target group.
-- Keep ACM cert in `us-east-1` for ALB in this deployment.
+- `InfraStack` supports `tlsCertificateArn` in environment config.
+- When set, CDK creates an ALB HTTPS listener (port `443`) forwarding to the app target group, and redirects HTTP→HTTPS on port `80`.
+- Keep ACM cert in `us-east-1` (required for ALB).
 
 Current prod reference:
 
-- Cert ARN:
-  - `arn:aws:acm:us-east-1:329599631467:certificate/7d4169bc-f43c-4bc3-a90d-632ab44702e8`
-- Domain:
-  - `https://app.oncologyexecutive.com/login`
+- Account: `169976658679` (profile: `overture-prod-member`)
+- Cert ARN: `arn:aws:acm:us-east-1:169976658679:certificate/1a0f0fc1-9efa-4e44-9518-7c5615a9720c`
+- Domain: `https://app.oncologyexecutive.com`
+- ALB: `InfraS-Overt-0Skd07h6vhIN-201122471.us-east-1.elb.amazonaws.com`
 - Cognito Hosted UI:
-  - domain: `overture-prod-auth`
-  - current branding mode: classic Hosted UI (`ManagedLoginVersion=1`)
+  - domain: `overture-prod-v2-auth`
+  - user pool: `us-east-1_VxyGsmzMC`
+  - app client: `ba2up4abg0p3jm07hs2vfshfn`
   - checked-in CSS asset: `infra/assets/cognito-hosted-ui-overture.css`
   - checked-in logo asset: `web/public/overture-logo.png`
 
 Verification commands:
 
 ```bash
-aws elbv2 describe-listeners \
-  --profile overture-prod \
-  --region us-east-1 \
-  --load-balancer-arn <PROD_ALB_ARN> \
-  --query 'Listeners[].[Port,Protocol]' --output table
-
 curl -sSI https://app.oncologyexecutive.com/login
+
 aws cognito-idp describe-user-pool-domain \
-  --profile overture-prod \
+  --profile overture-prod-member \
   --region us-east-1 \
-  --domain overture-prod-auth
+  --domain overture-prod-v2-auth
+
 aws cognito-idp get-ui-customization \
-  --profile overture-prod \
+  --profile overture-prod-member \
   --region us-east-1 \
-  --user-pool-id us-east-1_e1n33IfQN \
-  --client-id 7ungj1j1mafdg0isktfqv2v2ol
+  --user-pool-id us-east-1_VxyGsmzMC \
+  --client-id ba2up4abg0p3jm07hs2vfshfn
 ```

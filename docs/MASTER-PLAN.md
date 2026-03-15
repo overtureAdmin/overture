@@ -37,6 +37,15 @@ Gate to Phase 1:
 - [x] Upgrade stack-managed Lambda runtime from deprecated `nodejs20.x` to supported `nodejs22.x` before AWS deprecation milestones.
 - [x] Deploy runtime upgrade to canonical dev + staging stacks and validate runtime smoke coverage.
 
+### 0.4 AWS Organizations account isolation (completed `2026-03-15`)
+- [x] Move staging infrastructure to dedicated member account `192431908195`.
+- [x] Move prod infrastructure to dedicated member account `169976658679`.
+- [x] Rename all resources to `overture-*` prefix in staging + prod.
+- [x] Issue and validate ACM cert for `app.oncologyexecutive.com` in new prod account.
+- [x] Add conditional HTTPS listener to CDK `InfraStack` (controlled by `tlsCertificateArn`).
+- [x] Cut over DNS to new prod ALB and verify HTTPS end-to-end.
+- [x] Tear down all infra in old root/management account `329599631467`.
+
 Gate to Phase 1:
 - [x] Optional cleanup either completed or explicitly deferred in this file.
 

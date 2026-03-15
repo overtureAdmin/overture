@@ -15,8 +15,8 @@ Build an MVP prior-authorization appeal application that:
 ## Current Repo + Branch
 - Repo: `unity-appeals-mvp`
 - Branch: `main`
-- Latest local commit at handoff: `4a8cfc4`
-- Handoff date: `2026-03-12` (UTC)
+- Latest local commit at handoff: `574f5f0`
+- Handoff date: `2026-03-15` (UTC)
 
 ## What Is Implemented
 
@@ -74,13 +74,33 @@ Build an MVP prior-authorization appeal application that:
   - `ConfiguredCognitoUserPoolId = us-east-1_zl8zG5Dpl`
   - `ConfiguredCognitoAppClientId = 7a3qa4prrq1h9v71snfhqo36f4`
 
-### Staging-v2 (active, isolated)
+### Staging (active, isolated) — account `192431908195` (profile: `overture-staging`)
 - Network stack: `NetworkStack-staging`
 - App stack: `InfraStack-staging-v2`
 - ALB URL: `http://InfraS-Unity-iGMyoO90DG4I-1920092028.us-east-1.elb.amazonaws.com`
 - Cognito:
   - `ConfiguredCognitoUserPoolId = us-east-1_lJ4XChD2H`
   - `ConfiguredCognitoAppClientId = 5395vq9loa484ipjcgtr3o5lh2`
+
+### Prod (active) — account `169976658679` (profile: `overture-prod-member`)
+- Network stack: `NetworkStack-prod`
+- App stack: `InfraStack-prod`
+- ALB DNS: `InfraS-Overt-0Skd07h6vhIN-201122471.us-east-1.elb.amazonaws.com`
+- Live URL: `https://app.oncologyexecutive.com`
+- ECR: `169976658679.dkr.ecr.us-east-1.amazonaws.com/overture-web`
+- ECS cluster: `overture-prod-cluster`
+- Cognito:
+  - `ConfiguredCognitoUserPoolId = us-east-1_VxyGsmzMC`
+  - `ConfiguredCognitoAppClientId = ba2up4abg0p3jm07hs2vfshfn`
+  - Hosted UI domain: `overture-prod-v2-auth`
+- ACM cert: `arn:aws:acm:us-east-1:169976658679:certificate/1a0f0fc1-9efa-4e44-9518-7c5615a9720c`
+- DB: `overture-prod-db-v1.cer4ooo4sjo9.us-east-1.rds.amazonaws.com`
+- Secrets: `overture-prod-app-db-credentials`, `overture-prod-migrator-db-credentials`
+
+### Legacy Prod Stack
+- Account: `329599631467` (management/root account)
+- Status: decommissioned/deleted `2026-03-15`
+- Notes: all infra moved to member account `169976658679` via AWS Organizations.
 
 ### Legacy Staging Stack
 - Stack: `InfraStack-staging`
@@ -99,6 +119,30 @@ Build an MVP prior-authorization appeal application that:
   - schema verification: `migration smoke passed`
 - `cd infra && npm run smoke:runtime` passed (`dev` + `staging`).
 - `cd infra && npm run smoke:alarms` passed (`InfraStack-alb-target-5xx`, `InfraStack-staging-v2-alb-target-5xx`).
+
+## Latest Session Updates (`2026-03-15`) - AWS Organizations Account Migration
+
+### What was done
+- Migrated all prod infrastructure from root/management account `329599631467` to member account `169976658679`.
+- Migrated staging infrastructure from root account to member account `192431908195`.
+- Renamed all resources to `overture-*` prefix (staging + prod).
+- Deployed `NetworkStack-prod` + `InfraStack-prod` in new prod account.
+- Provisioned three-tier DB credentials (`overture_app`, `overture_migrator`) in new prod RDS.
+- Applied all 15 migrations in new prod RDS via ECS Fargate one-off task.
+- Issued and validated ACM cert for `app.oncologyexecutive.com` in account `169976658679`.
+- Added conditional HTTPS listener to `InfraStack` (only activates when `tlsCertificateArn` is set).
+- Updated DNS: `app.oncologyexecutive.com` → new prod ALB.
+- Tore down old prod stacks (`InfraStack-prod`, `NetworkStack-prod`) in `329599631467`.
+- Deleted old prod RDS instance (`overture-prod-db-v1`) in `329599631467` after disabling deletion protection.
+- Verified `https://app.oncologyexecutive.com` returns HTTP/2 200 from new account.
+
+### Key infra changes
+- `infra/cdk.json`: new account IDs, `overture-*` resource names, cert ARN
+- `infra/lib/infra-stack.ts`: HTTPS listener is now conditional on `tlsCertificateArn` (previously always applied, which detached the target group)
+- `infra/.gitignore`: added `cdk.out.*` to exclude named CDK output snapshots
+
+### Commits
+- `574f5f0` `Migrate prod and staging to AWS Organizations member accounts`
 
 ## Latest Session Updates (`2026-03-12`) - App-Native Authentication Redesign
 - Replaced the old `/login` bridge page with a new app-native auth workspace in `web/src/components/auth/auth-workspace.tsx` and `web/src/app/login/page.tsx`.

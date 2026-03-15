@@ -12,9 +12,11 @@ Last updated: 2026-02-22
 ## Pre-Deploy
 
 - [ ] Confirm canonical stacks only:
-  - dev app: `InfraStack`
-  - staging app: `InfraStack-staging-v2`
-  - staging network: `NetworkStack-staging`
+  - dev app: `InfraStack` (account `726792844549`)
+  - staging network: `NetworkStack-staging` (account `192431908195`, profile: `overture-staging`)
+  - staging app: `InfraStack-staging-v2` (account `192431908195`, profile: `overture-staging`)
+  - prod network: `NetworkStack-prod` (account `169976658679`, profile: `overture-prod-member`)
+  - prod app: `InfraStack-prod` (account `169976658679`, profile: `overture-prod-member`)
 - [ ] Review `docs/HANDOFF-STATE.md` for current runtime truth and unresolved gaps.
 - [ ] Confirm AWS credentials/region (`us-east-1`) are correct for deploy actor.
 
@@ -25,7 +27,9 @@ Last updated: 2026-02-22
 - [ ] Deploy dev:
   - `cd infra && npx cdk deploy InfraStack --require-approval never`
 - [ ] Deploy staging network/app:
-  - `cd infra && npx cdk deploy NetworkStack-staging InfraStack-staging-v2 -c environment=staging --require-approval never`
+  - `cd infra && AWS_PROFILE=overture-staging npx cdk deploy NetworkStack-staging InfraStack-staging-v2 -c environment=staging --require-approval never`
+- [ ] Deploy prod network/app:
+  - `cd infra && AWS_PROFILE=overture-prod-member npx cdk deploy NetworkStack-prod InfraStack-prod -c environment=prod --require-approval never`
 
 ## Migrate
 
