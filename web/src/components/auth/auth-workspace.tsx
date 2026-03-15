@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import {
@@ -21,7 +21,6 @@ import {
   AuthHeading,
   AuthInput,
   AuthKicker,
-  AuthLegalCard,
   AuthLinkButton,
   AuthPrimaryButton,
   AuthSecondaryButton,
@@ -34,7 +33,7 @@ type AuthWorkspaceProps = {
 };
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
-type SignupStage = "account" | "organization" | "profile" | "legal" | "confirm" | "mfa";
+type SignupStage = "account" | "organization" | "profile" | "terms" | "baa" | "confirm" | "mfa";
 type AuthStatus =
   | { kind: "idle" }
   | { kind: "busy"; label: string }
@@ -146,6 +145,14 @@ function normalizePhoneNumber(input: string) {
   return digits ? `+1 ${digits}` : trimmed;
 }
 
+function formatPhoneDisplay(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 10);
+  if (digits.length === 0) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 function buildMaskedPassword(password: string) {
   if (password.length < 12) {
     return "Use at least 12 characters.";
@@ -250,6 +257,22 @@ function authHeader(mode: AuthMode, loginMfaSession: string | null, signupStage:
     };
   }
 
+  if (signupStage === "terms") {
+    return {
+      kicker: "Legal Review",
+      title: "Terms of Use",
+      body: "Scroll through the full document before accepting.",
+    };
+  }
+
+  if (signupStage === "baa") {
+    return {
+      kicker: "Legal Review",
+      title: "Business Associate Agreement",
+      body: "Scroll through the full document before accepting.",
+    };
+  }
+
   if (signupStage === "confirm") {
     return {
       kicker: "Create Account",
@@ -332,10 +355,26 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
     }
   }, [signup.firstName, signup.lastName, signup.legalName]);
 
+  const termsScrollRef = useRef<HTMLDivElement>(null);
+  const baaScrollRef = useRef<HTMLDivElement>(null);
+  const [termsScrolled, setTermsScrolled] = useState(false);
+  const [baaScrolled, setBaaScrolled] = useState(false);
+
   const passwordGuidance = useMemo(() => buildMaskedPassword(signup.password), [signup.password]);
   const currentHeader = authHeader(mode, loginMfaSession, signupStage);
   const busy = status.kind === "busy";
+  const isLegal = mode === "signup" && (signupStage === "terms" || signupStage === "baa");
   const isWizard = mode === "signup" && signupStage !== "account";
+
+  function handleTermsScroll() {
+    const el = termsScrollRef.current;
+    if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setTermsScrolled(true);
+  }
+
+  function handleBaaScroll() {
+    const el = baaScrollRef.current;
+    if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setBaaScrolled(true);
+  }
 
   async function routeAfterAuthentication(preferredPath?: string) {
     const profile = await getProfileStatus();
@@ -554,16 +593,6 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
     }
 
     if (signupStage === "profile") {
-      if (!signup.legalName.trim()) {
-        return "Legal name is required.";
-      }
-      return null;
-    }
-
-    if (signupStage === "legal") {
-      if (!signup.acceptTerms || !signup.acceptBaa) {
-        return "Both the Terms of Use and BAA must be accepted to continue.";
-      }
       return null;
     }
 
@@ -580,7 +609,14 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
       return;
     }
 
-    if (signupStage === "legal") {
+    if (signupStage === "terms") {
+      setSignup((current) => ({ ...current, acceptTerms: true }));
+      setSignupStage("baa");
+      return;
+    }
+
+    if (signupStage === "baa") {
+      setSignup((current) => ({ ...current, acceptBaa: true }));
       setStatus({ kind: "busy", label: "Creating your account..." });
       try {
         const result = await postJson<SignupResponse>("/api/auth/signup", {
@@ -622,7 +658,7 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
     setSignupStage((current) => {
       if (current === "account") return "organization";
       if (current === "organization") return "profile";
-      if (current === "profile") return "legal";
+      if (current === "profile") return "terms";
       return current;
     });
   }
@@ -786,7 +822,7 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
 
   return (
     <AuthShell>
-      <div className={`w-full transition-[max-width] duration-300 ease-in-out ${isWizard ? "max-w-[560px]" : "max-w-[440px]"}`}>
+      <div className={`w-full transition-[max-width] duration-300 ease-in-out ${isLegal ? "max-w-[75vw]" : isWizard ? "max-w-[560px]" : "max-w-[440px]"}`}>
         <AuthCard>
           <div className="space-y-5">
             <div className="flex justify-center pb-1">
@@ -1006,24 +1042,23 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
                   />
                 </AuthField>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <AuthField label="Password" hint={passwordGuidance ?? "Meets current platform requirements."}>
-                    <AuthInput
-                      type="password"
-                      autoComplete="new-password"
-                      value={signup.password}
-                      onChange={(event) => setSignup((current) => ({ ...current, password: event.target.value }))}
-                    />
-                  </AuthField>
-                  <AuthField label="Confirm password">
-                    <AuthInput
-                      type="password"
-                      autoComplete="new-password"
-                      value={signup.confirmPassword}
-                      onChange={(event) => setSignup((current) => ({ ...current, confirmPassword: event.target.value }))}
-                    />
-                  </AuthField>
-                </div>
+                <AuthField label="Password" hint={passwordGuidance ?? "At least 12 characters, upper, lower, and a number."}>
+                  <AuthInput
+                    type="password"
+                    autoComplete="new-password"
+                    value={signup.password}
+                    onChange={(event) => setSignup((current) => ({ ...current, password: event.target.value }))}
+                  />
+                </AuthField>
+
+                <AuthField label="Confirm password">
+                  <AuthInput
+                    type="password"
+                    autoComplete="new-password"
+                    value={signup.confirmPassword}
+                    onChange={(event) => setSignup((current) => ({ ...current, confirmPassword: event.target.value }))}
+                  />
+                </AuthField>
 
                 <div className="space-y-3 pt-1">
                   <AuthPrimaryButton type="submit" className="w-full">
@@ -1092,14 +1127,6 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
 
             {mode === "signup" && signupStage === "profile" ? (
               <form className="space-y-4" onSubmit={onAdvanceSignup}>
-                <AuthField label="Legal name" hint="Used for legal acceptance records and profile setup.">
-                  <AuthInput
-                    value={signup.legalName}
-                    onChange={(event) => setSignup((current) => ({ ...current, legalName: event.target.value }))}
-                    placeholder="Your full legal name"
-                  />
-                </AuthField>
-
                 <div className="grid gap-4 sm:grid-cols-2">
                   <AuthField label="Job title">
                     <AuthInput
@@ -1108,12 +1135,15 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
                       placeholder="Medical Director"
                     />
                   </AuthField>
-                  <AuthField label="Phone number" hint="Include country code.">
+                  <AuthField label="Phone number">
                     <AuthInput
                       type="tel"
+                      inputMode="tel"
                       value={signup.phone}
-                      onChange={(event) => setSignup((current) => ({ ...current, phone: event.target.value }))}
-                      placeholder="+1 312 555 0148"
+                      onChange={(event) =>
+                        setSignup((current) => ({ ...current, phone: formatPhoneDisplay(event.target.value) }))
+                      }
+                      placeholder="(312) 555-0148"
                     />
                   </AuthField>
                 </div>
@@ -1129,36 +1159,54 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
               </form>
             ) : null}
 
-            {mode === "signup" && signupStage === "legal" ? (
+            {mode === "signup" && signupStage === "terms" ? (
               <form className="space-y-4" onSubmit={onAdvanceSignup}>
-                <div className="space-y-3">
-                  <AuthSectionNote>
-                    Review the terms below. These records are captured as part of enterprise account onboarding.
-                  </AuthSectionNote>
-                  <div className="grid gap-3">
-                    <AuthLegalCard title="Terms of Use" paragraphs={TERMS_OF_USE_COPY} />
-                    <AuthLegalCard title="Business Associate Agreement" paragraphs={BAA_COPY} />
+                <div
+                  ref={termsScrollRef}
+                  onScroll={handleTermsScroll}
+                  className="max-h-[55vh] overflow-y-auto rounded-[18px] border border-[#e5dde9] bg-[#fcfbfd] px-5 py-4 text-[13px] leading-7 text-[#61556d]"
+                >
+                  <div className="space-y-3">
+                    {TERMS_OF_USE_COPY.map((paragraph, i) => (
+                      <p key={i}>{paragraph}</p>
+                    ))}
                   </div>
                 </div>
-
-                <div className="space-y-3 rounded-[20px] border border-[#e7dfea] bg-[#faf8fb] p-4">
-                  <AuthCheckbox
-                    checked={signup.acceptTerms}
-                    onChange={(checked) => setSignup((current) => ({ ...current, acceptTerms: checked }))}
-                    label="I have reviewed and accept the Terms of Use for Overture."
-                  />
-                  <AuthCheckbox
-                    checked={signup.acceptBaa}
-                    onChange={(checked) => setSignup((current) => ({ ...current, acceptBaa: checked }))}
-                    label="I am authorized to accept the BAA on behalf of my organization."
-                  />
-                </div>
-
+                {!termsScrolled ? (
+                  <p className="text-center text-[12px] text-[#998aa8]">Scroll to the bottom to accept</p>
+                ) : null}
                 <div className="space-y-3 pt-1">
-                  <AuthPrimaryButton type="submit" disabled={busy} className="w-full">
-                    {busy ? status.label : "Create account"}
+                  <AuthPrimaryButton type="submit" disabled={!termsScrolled} className="w-full">
+                    Accept Terms of Use
                   </AuthPrimaryButton>
                   <AuthSecondaryButton type="button" className="w-full" onClick={() => setSignupStage("profile")}>
+                    Back
+                  </AuthSecondaryButton>
+                </div>
+              </form>
+            ) : null}
+
+            {mode === "signup" && signupStage === "baa" ? (
+              <form className="space-y-4" onSubmit={onAdvanceSignup}>
+                <div
+                  ref={baaScrollRef}
+                  onScroll={handleBaaScroll}
+                  className="max-h-[55vh] overflow-y-auto rounded-[18px] border border-[#e5dde9] bg-[#fcfbfd] px-5 py-4 text-[13px] leading-7 text-[#61556d]"
+                >
+                  <div className="space-y-3">
+                    {BAA_COPY.map((paragraph, i) => (
+                      <p key={i}>{paragraph}</p>
+                    ))}
+                  </div>
+                </div>
+                {!baaScrolled ? (
+                  <p className="text-center text-[12px] text-[#998aa8]">Scroll to the bottom to accept</p>
+                ) : null}
+                <div className="space-y-3 pt-1">
+                  <AuthPrimaryButton type="submit" disabled={busy || !baaScrolled} className="w-full">
+                    {busy ? status.label : "Accept BAA & Create Account"}
+                  </AuthPrimaryButton>
+                  <AuthSecondaryButton type="button" className="w-full" onClick={() => setSignupStage("terms")}>
                     Back
                   </AuthSecondaryButton>
                 </div>
@@ -1185,7 +1233,7 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
                   <AuthLinkButton type="button" onClick={() => void onResendCode()} disabled={resendCountdown > 0}>
                     {resendCountdown > 0 ? `Resend available in ${resendCountdown}s` : "Resend code"}
                   </AuthLinkButton>
-                  <AuthLinkButton type="button" onClick={() => setSignupStage("legal")}>
+                  <AuthLinkButton type="button" onClick={() => setSignupStage("baa")}>
                     Back to account details
                   </AuthLinkButton>
                 </div>
