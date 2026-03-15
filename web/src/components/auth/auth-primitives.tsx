@@ -1,17 +1,23 @@
 import { ReactNode } from "react";
 
-export function AuthShell(props: { children: ReactNode; aside: ReactNode }) {
+export function AuthShell(props: { children: ReactNode; aside?: ReactNode }) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f5f2f8] px-4 py-4 sm:px-5 sm:py-5 lg:px-8 lg:py-8">
+    <main className="relative min-h-screen overflow-hidden bg-[#f5f2f8] px-4 py-8">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_12%,rgba(125,78,173,0.10),transparent_34%),radial-gradient(circle_at_88%_16%,rgba(166,133,205,0.12),transparent_28%),linear-gradient(180deg,#f8f6fa_0%,#f2eef6_100%)]" />
         <div className="absolute left-[-9rem] top-[-6rem] h-72 w-72 rounded-full bg-[#e8dcf5] opacity-70 blur-3xl" />
         <div className="absolute bottom-[-8rem] right-[12%] h-72 w-72 rounded-full bg-[#ece4f8] opacity-80 blur-3xl" />
       </div>
-      <div className="relative mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-[1320px] grid-cols-1 gap-6 lg:grid-cols-[0.86fr_1.14fr] lg:items-center lg:gap-10">
-        {props.aside}
-        {props.children}
-      </div>
+      {props.aside ? (
+        <div className="relative mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[1320px] grid-cols-1 gap-6 lg:grid-cols-[0.86fr_1.14fr] lg:items-center lg:gap-10">
+          {props.aside}
+          {props.children}
+        </div>
+      ) : (
+        <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center">
+          {props.children}
+        </div>
+      )}
     </main>
   );
 }

@@ -16,7 +16,6 @@ import {
 import { BAA_COPY, TERMS_OF_USE_COPY } from "@/lib/legal-copy";
 import {
   AuthAlert,
-  AuthAside,
   AuthCard,
   AuthField,
   AuthHeading,
@@ -24,7 +23,6 @@ import {
   AuthKicker,
   AuthLegalCard,
   AuthLinkButton,
-  AuthPanel,
   AuthPrimaryButton,
   AuthProgress,
   AuthSecondaryButton,
@@ -104,32 +102,6 @@ function LockIcon() {
   );
 }
 
-function SparkIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-4 w-4 text-[#6d24a2]">
-      <path d="M10 2.75 11.85 8.15 17.25 10 11.85 11.85 10 17.25 8.15 11.85 2.75 10 8.15 8.15 10 2.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function EvidenceIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-4 w-4 text-[#6d24a2]">
-      <path d="M6.25 3.5h5.4L15 6.85v9.15a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 5 16V5a1.5 1.5 0 0 1 1.25-1.48Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M11.5 3.75V7h3.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M7.75 10h4.5M7.75 12.75h4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function TeamIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="h-4 w-4 text-[#6d24a2]">
-      <path d="M7.25 9a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5ZM12.75 10.25A1.75 1.75 0 1 0 12.75 6.75a1.75 1.75 0 0 0 0 3.5Z" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M3.75 15.5a3.75 3.75 0 0 1 7.5 0M11 15.5a2.75 2.75 0 0 1 5.5 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 async function parseError(response: Response): Promise<string> {
   try {
@@ -185,72 +157,6 @@ function buildMaskedPassword(password: string) {
   return null;
 }
 
-function BrandPanel() {
-  const capabilities = [
-    {
-      icon: <SparkIcon />,
-      label: "AI-assisted drafting",
-      detail: "Turn case context into payer-ready appeal language.",
-    },
-    {
-      icon: <EvidenceIcon />,
-      label: "Payer intelligence",
-      detail: "Keep policy evidence, records, and supporting materials aligned.",
-    },
-    {
-      icon: <TeamIcon />,
-      label: "Team workflow",
-      detail: "Coordinate reviews, revisions, and case status without handoff noise.",
-    },
-  ];
-
-  return (
-    <AuthAside>
-      <div className="flex h-full flex-col justify-between gap-10">
-        <div className="space-y-8">
-          <div className="flex items-center gap-3">
-            <img src="/overture-logo.png" alt="Overture" className="h-8 w-auto" />
-            <div className="h-6 w-px bg-[#dfd6e5]" />
-            <span className="text-[13px] font-medium tracking-[0.08em] text-[#46384f]">Overture</span>
-          </div>
-
-          <div className="max-w-[470px] space-y-4">
-            <AuthKicker>OVERTURE</AuthKicker>
-            <h1 className="max-w-[10ch] text-[2.4rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#211428] sm:text-[2.9rem]">
-              Revenue integrity, without the chaos.
-            </h1>
-            <p className="max-w-[48ch] text-[15px] leading-7 text-[#625867]">
-              Review denials, draft appeals, and manage payer evidence in one secure workspace built for serious operational teams.
-            </p>
-          </div>
-
-          <div className="space-y-1 divide-y divide-[#ebe5ef]">
-            {capabilities.map((item) => (
-              <div key={item.label} className="flex items-start gap-4 py-4">
-                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#f2edf7]">{item.icon}</div>
-                <div className="space-y-1">
-                  <p className="text-[14px] font-semibold tracking-[-0.01em] text-[#2e2138]">{item.label}</p>
-                  <p className="max-w-[42ch] text-[13px] leading-6 text-[#716577]">{item.detail}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-4 border-t border-[#ebe4ef] pt-5 text-[13px] text-[#6c6172] sm:grid-cols-2">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#867992]">Workspace</p>
-            <p className="mt-2 leading-6">Denials, prior auth, LMNs, payer evidence, and appeals in one controlled workflow.</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#867992]">Security</p>
-            <p className="mt-2 leading-6">Enterprise account setup with MFA, legal acceptance, and organization controls.</p>
-          </div>
-        </div>
-      </div>
-    </AuthAside>
-  );
-}
 
 function AuthModeTabs(props: {
   active: "login" | "signup";
@@ -917,11 +823,14 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
   ];
 
   return (
-    <AuthShell aside={<BrandPanel />}>
-      <AuthPanel>
+    <AuthShell>
+      <div className="w-full max-w-[440px] space-y-6">
+        <div className="flex justify-center pb-2">
+          <img src="/overture-logo.png" alt="Overture" className="h-9 w-auto" />
+        </div>
         <AuthCard>
           <div className="space-y-5">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex justify-center">
               <AuthModeTabs
                 active={primaryTab}
                 onLogin={() => {
@@ -936,10 +845,6 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
                   }
                 }}
               />
-              <div className="hidden items-center gap-2 rounded-full border border-[#ece5f1] bg-[#faf8fb] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-[#7d7188] sm:inline-flex">
-                <LockIcon />
-                Secure access
-              </div>
             </div>
 
             <div className="space-y-3">
@@ -1418,7 +1323,7 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
             ) : null}
           </div>
         </AuthCard>
-      </AuthPanel>
+      </div>
     </AuthShell>
   );
 }
