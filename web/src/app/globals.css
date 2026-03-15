@@ -1,24 +1,38 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3f8fa;
-  --foreground: #2f1f48;
-  --surface: #fcfafe;
-  --surface-alt: #f6effc;
+  /* Surfaces */
+  --background: #f5f6fa;
+  --foreground: #1f1f24;
+  --surface: #ffffff;
+  --surface-alt: #f0e8fa;
   --surface-soft: #f7f2fb;
-  --border: #d9cde7;
-  --border-strong: #c6b5dc;
-  --accent: #6d24a2;
-  --accent-strong: #571587;
-  --accent-soft: #efe4f9;
-  --muted: #6f5b8a;
-  --danger: #c7374d;
+  --border: #e3e6ef;
+  --border-strong: #c9b8e0;
+
+  /* Primary purple — vibrant, UI-friendly */
+  --accent: #8b31c7;
+  --accent-hover: #9b3fe8;
+  --accent-strong: #6b28a6;
+  --accent-active: #5a2090;
+  --accent-soft: #f0e4fb;
+  --accent-glow: #b060f0;
+
+  /* Semantic */
+  --success: #27d3c2;
+  --warning: #ffb020;
+  --danger: #ff3eb5;
+  --info: #3a7bff;
+
+  /* Text */
+  --muted: #6b6b80;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-sans: var(--font-sans, "Inter", "Segoe UI", "Helvetica Neue", sans-serif);
+  --font-serif: var(--font-serif, "Fraunces", Georgia, serif);
   --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
 }
 
@@ -34,11 +48,19 @@ body {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 10% -5%, #fbf7ff 0%, rgba(251, 247, 255, 0) 42%),
-    radial-gradient(circle at 90% 10%, #f3ebfc 0%, rgba(243, 235, 252, 0) 38%),
+    radial-gradient(circle at 10% -5%, #f3e8fd 0%, rgba(243, 232, 253, 0) 42%),
+    radial-gradient(circle at 90% 10%, #ede4f8 0%, rgba(237, 228, 248, 0) 38%),
     var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* Serif display headings — use on page titles and dashboard headers */
+.heading-display {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 a {
@@ -78,7 +100,7 @@ a {
 
 .calm-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(109, 36, 162, 0.14);
+  box-shadow: 0 0 0 3px rgba(139, 49, 199, 0.14);
 }
 
 .calm-primary,
@@ -95,7 +117,7 @@ a {
 }
 
 .calm-primary:hover {
-  background: var(--accent-strong);
+  background: var(--accent-hover);
 }
 
 .calm-primary:active {
@@ -110,7 +132,7 @@ a {
 .calm-ghost {
   border: 1px solid var(--border);
   background: #fff;
-  color: #4d2e6d;
+  color: var(--accent-strong);
 }
 
 .calm-ghost:hover {
@@ -121,7 +143,7 @@ a {
 .calm-cta {
   border: 1px solid transparent;
   background: transparent;
-  color: #4f3171;
+  color: var(--accent);
 }
 
 .calm-cta:hover {
@@ -133,11 +155,23 @@ a {
   align-items: center;
   border: 1px solid #d8c7ea;
   border-radius: 9999px;
-  background: #f3e9fc;
-  color: #5b377c;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   font-weight: 500;
 }
 
 .text-danger {
   color: var(--danger);
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.text-success {
+  color: var(--success);
+}
+
+.text-warning {
+  color: var(--warning);
 }
