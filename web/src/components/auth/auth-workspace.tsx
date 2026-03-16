@@ -360,6 +360,16 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
   const [termsScrolled, setTermsScrolled] = useState(false);
   const [baaScrolled, setBaaScrolled] = useState(false);
 
+  // If the MFA setup page is showing but session state was lost (refresh, expiry, prior error),
+  // redirect to login immediately rather than letting the user hit a dead-end error.
+  useEffect(() => {
+    if (signupStage === "mfa" && !pendingChallengeSetup && !pendingAuthSetup) {
+      setMode("login");
+      setSignupStage("account");
+      setError("Your MFA setup session expired. Please sign in again to continue.");
+    }
+  }, [signupStage, pendingChallengeSetup, pendingAuthSetup]);
+
   useEffect(() => {
     const el = termsScrollRef.current;
     if (!el) return;
@@ -1314,12 +1324,9 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
                       setPendingAuthSetup(null);
                       setPendingChallengeSetup(null);
                       setMfaSetupCode("");
-                      if (pendingChallengeSetup) {
-                        resetTransientState();
-                        setMode("login");
-                      } else {
-                        setSignupStage("confirm");
-                      }
+                      resetTransientState();
+                      setMode("login");
+                      setSignupStage("account");
                     }}
                   >
                     Back
