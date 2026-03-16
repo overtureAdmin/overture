@@ -132,14 +132,12 @@ async function parseClaimsFromAuthHeader(request: Request): Promise<AuthContext 
     return null;
   }
 
-  const tenantValue = claims["custom:tenant_id"] ?? claims.tenant_id;
   const subValue = claims.sub;
-  if (typeof tenantValue !== "string" || tenantValue.length === 0) {
-    return null;
-  }
   if (typeof subValue !== "string" || subValue.length === 0) {
     return null;
   }
+  // Fall back to sub when custom:tenant_id hasn't been assigned yet (new users pre-onboarding).
+  const tenantValue = claims["custom:tenant_id"] ?? claims.tenant_id ?? subValue;
 
   return {
     tenantId: tenantValue,
