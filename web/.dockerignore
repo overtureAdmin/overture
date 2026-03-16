@@ -1,7 +1,0 @@
-node_modules
-node_modules_corrupt*
-.next
-npm-debug.log
-.DS_Store
-coverage
-*.local

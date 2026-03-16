@@ -360,21 +360,33 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
   const [termsScrolled, setTermsScrolled] = useState(false);
   const [baaScrolled, setBaaScrolled] = useState(false);
 
+  useEffect(() => {
+    const el = termsScrollRef.current;
+    if (!el) return;
+    function check() {
+      if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setTermsScrolled(true);
+    }
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    return () => el.removeEventListener("scroll", check);
+  }, [signupStage]);
+
+  useEffect(() => {
+    const el = baaScrollRef.current;
+    if (!el) return;
+    function check() {
+      if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setBaaScrolled(true);
+    }
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    return () => el.removeEventListener("scroll", check);
+  }, [signupStage]);
+
   const passwordGuidance = useMemo(() => buildMaskedPassword(signup.password), [signup.password]);
   const currentHeader = authHeader(mode, loginMfaSession, signupStage);
   const busy = status.kind === "busy";
   const isLegal = mode === "signup" && (signupStage === "terms" || signupStage === "baa");
   const isWizard = mode === "signup" && signupStage !== "account";
-
-  function handleTermsScroll() {
-    const el = termsScrollRef.current;
-    if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setTermsScrolled(true);
-  }
-
-  function handleBaaScroll() {
-    const el = baaScrollRef.current;
-    if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setBaaScrolled(true);
-  }
 
   async function routeAfterAuthentication(preferredPath?: string) {
     const profile = await getProfileStatus();
@@ -1166,8 +1178,7 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
               <form className="space-y-4" onSubmit={onAdvanceSignup}>
                 <div
                   ref={termsScrollRef}
-                  onScroll={handleTermsScroll}
-                  className="max-h-[55vh] overflow-y-auto rounded-[18px] border border-[#e5dde9] bg-[#fcfbfd] px-5 py-4 text-[13px] leading-7 text-[#61556d]"
+                  className="max-h-[260px] overflow-y-auto rounded-[18px] border border-[#e5dde9] bg-[#fcfbfd] px-5 py-4 text-[13px] leading-7 text-[#61556d]"
                 >
                   <div className="space-y-3">
                     {TERMS_OF_USE_COPY.map((paragraph, i) => (
@@ -1193,8 +1204,7 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
               <form className="space-y-4" onSubmit={onAdvanceSignup}>
                 <div
                   ref={baaScrollRef}
-                  onScroll={handleBaaScroll}
-                  className="max-h-[55vh] overflow-y-auto rounded-[18px] border border-[#e5dde9] bg-[#fcfbfd] px-5 py-4 text-[13px] leading-7 text-[#61556d]"
+                  className="max-h-[260px] overflow-y-auto rounded-[18px] border border-[#e5dde9] bg-[#fcfbfd] px-5 py-4 text-[13px] leading-7 text-[#61556d]"
                 >
                   <div className="space-y-3">
                     {BAA_COPY.map((paragraph, i) => (
