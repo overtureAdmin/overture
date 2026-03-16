@@ -277,7 +277,7 @@ function authHeader(mode: AuthMode, loginMfaSession: string | null, signupStage:
     return {
       kicker: "Create Account",
       title: "Confirm your email",
-      body: "Enter the verification code we sent to finish securing your account.",
+      body: "Check your inbox for a verification code and enter it below.",
     };
   }
 
@@ -1228,10 +1228,6 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
 
             {mode === "signup" && signupStage === "confirm" ? (
               <form className="space-y-4" onSubmit={onConfirmSignUp}>
-                <AuthSectionNote>
-                  We sent a verification code to <span className="font-medium text-[#43364f]">{signup.email || "your email address"}</span>.
-                </AuthSectionNote>
-
                 <AuthField label="Verification code">
                   <AuthInput
                     inputMode="numeric"
@@ -1318,7 +1314,12 @@ export function AuthWorkspace(props: AuthWorkspaceProps) {
                       setPendingAuthSetup(null);
                       setPendingChallengeSetup(null);
                       setMfaSetupCode("");
-                      setSignupStage("confirm");
+                      if (pendingChallengeSetup) {
+                        resetTransientState();
+                        setMode("login");
+                      } else {
+                        setSignupStage("confirm");
+                      }
                     }}
                   >
                     Back
